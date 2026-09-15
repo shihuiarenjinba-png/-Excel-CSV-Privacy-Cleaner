@@ -14,6 +14,15 @@ with tempfile.TemporaryDirectory() as tmp:
     text = csv_out.read_text(encoding="utf-8-sig")
     assert "alice@example.com" not in text
 
+    bad_csv = root / "undecodable.csv"
+    bad_csv.write_bytes(b"\x81")
+    try:
+        clean_csv(bad_csv, root / "bad.csv", set(), "mask", "salt")
+    except UnicodeError:
+        pass
+    else:
+        raise AssertionError("Undecodable CSV must be rejected")
+
     xlsx_src = root / "sample.xlsx"
     wb = Workbook()
     wb.properties.creator = "Private Author"
