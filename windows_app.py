@@ -10,6 +10,7 @@ EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?81[- ]?)?0?\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}(?!\d)")
 EXTERNAL_FORMULA_RE = re.compile(r"\[[^\]]+\.(?:xls|xlsx|xlsm|xlsb|csv)\]", re.I)
 TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp932", "utf-16")
+MODES = {"mask", "pseudonymize", "drop"}
 
 
 def pseudonym(value: object, salt: str) -> str:
@@ -32,33 +33,78 @@ def parse_columns(text: str) -> set[str]:
     return {c.strip() for c in text.split(",") if c.strip()}
 
 
+def validate_decoded_text(text: str) -> str:
+    if "\x00" in text:
+        raise UnicodeError("Decoded text contains NUL bytes and appears binary.")
+    if text:
+        controls = sum(ord(ch) < 32 and ch not in "\t\n\r\f" for ch in text)
+        if controls / len(text) > 0.01:
+            raise UnicodeError("Decoded text contains too many control characters and appears binary.")
+    return text
+
+
 def decode_text(raw: bytes) -> str:
     last_error: UnicodeError | None = None
     for enc in TEXT_ENCODINGS:
         try:
-            return raw.decode(enc)
+            return validate_decoded_text(raw.decode(enc))
         except UnicodeError as exc:
             last_error = exc
     raise UnicodeError(f"Unsupported or undecodable CSV encoding; supported encodings: {', '.join(TEXT_ENCODINGS)}") from last_error
 
 
+def ensure_distinct_paths(src: Path, out: Path) -> None:
+    try:
+        same = src.resolve() == out.resolve()
+    except OSError:
+        same = src.absolute() == out.absolute()
+    if same:
+        raise ValueError("Refusing to overwrite the original file.")
+
+
+def validate_headers(raw_headers: list[object], *, label: str) -> list[str]:
+    headers = ["" if value is None else str(value).strip() for value in raw_headers]
+    if not headers or not any(headers):
+        raise ValueError(f"{label} header row is missing or could not be parsed.")
+    if any(not header for header in headers):
+        raise ValueError(f"{label} contains a blank header. Every processed column must have a unique name.")
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for header in headers:
+        if header in seen and header not in duplicates:
+            duplicates.append(header)
+        seen.add(header)
+    if duplicates:
+        raise ValueError(f"Duplicate {label} header(s): " + ", ".join(duplicates))
+    return headers
+
+
 def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> dict:
+    ensure_distinct_paths(src, out)
+    if mode not in MODES:
+        raise ValueError("Mode must be mask, pseudonymize, or drop.")
+
     decoded = decode_text(src.read_bytes())
     reader = csv.DictReader(decoded.splitlines())
-    headers = list(reader.fieldnames or [])
-    if not headers:
-        raise ValueError("CSV header row is missing or could not be parsed.")
-    rows = list(reader)
+    headers = validate_headers(list(reader.fieldnames or []), label="CSV")
+    rows: list[dict] = []
+    for line_no, row in enumerate(reader, start=2):
+        if None in row:
+            raise ValueError(f"CSV row has more fields than the header at line {line_no}.")
+        rows.append(row)
+
     selected = columns or set(headers)
     unknown = sorted(selected - set(headers))
     if columns and unknown:
         raise ValueError("Requested column(s) not found: " + ", ".join(unknown))
+
     if mode == "drop":
         out_headers = [h for h in headers if h not in selected]
         if not out_headers:
             raise ValueError("Refusing to drop every CSV column.")
     else:
         out_headers = headers
+
     with out.open("w", encoding="utf-8-sig", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=out_headers)
         writer.writeheader()
@@ -96,6 +142,10 @@ def scrub_core_properties(wb) -> None:
 def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, remove_hidden: bool, remove_comments: bool) -> dict:
     from openpyxl import load_workbook
 
+    ensure_distinct_paths(src, out)
+    if mode not in MODES:
+        raise ValueError("Mode must be mask, pseudonymize, or drop.")
+
     wb = load_workbook(src, keep_links=False)
     scrub_core_properties(wb)
     removed_sheets = 0
@@ -108,11 +158,18 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
             removed_sheets += 1
             continue
 
-        headers = {str(cell.value).strip(): cell.column for cell in ws[1] if cell.value is not None}
+        raw_headers = [cell.value for cell in ws[1]]
+        if any(value not in (None, "") for value in raw_headers):
+            header_names = validate_headers(raw_headers, label=f"worksheet '{ws.title}'")
+            headers = {name: index + 1 for index, name in enumerate(header_names)}
+        else:
+            headers = {}
+
         selected = columns or set(headers.keys())
         unknown = sorted(selected - set(headers.keys()))
         if columns and unknown:
             raise ValueError(f"Sheet '{ws.title}' is missing requested column(s): " + ", ".join(unknown))
+
         if mode == "drop":
             indices = sorted([headers[c] for c in selected if c in headers], reverse=True)
             if indices and len(indices) >= ws.max_column:
@@ -202,7 +259,7 @@ class App:
         if not self.file:
             return messagebox.showinfo("Privacy Cleaner", "Choose a file first.")
         mode = self.mode.get().strip().lower()
-        if mode not in {"mask", "pseudonymize", "drop"}:
+        if mode not in MODES:
             return messagebox.showerror("Privacy Cleaner", "Mode must be mask, pseudonymize, or drop.")
         ext = self.file.suffix.lower()
         if ext not in {".csv", ".xlsx"}:
