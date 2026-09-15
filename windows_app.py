@@ -9,10 +9,11 @@ from tkinter import BOTH, END, LEFT, Button, Checkbutton, Entry, Frame, IntVar, 
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?81[- ]?)?0?\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}(?!\d)")
 EXTERNAL_FORMULA_RE = re.compile(r"\[[^\]]+\.(?:xls|xlsx|xlsm|xlsb|csv)\]", re.I)
+TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp932", "utf-16")
 
 
 def pseudonym(value: object, salt: str) -> str:
-    raw = f"{salt}|{value}".encode("utf-8", errors="ignore")
+    raw = f"{salt}|{value}".encode("utf-8", errors="strict")
     return "USER-" + hashlib.sha256(raw).hexdigest()[:10].upper()
 
 
@@ -31,22 +32,31 @@ def parse_columns(text: str) -> set[str]:
     return {c.strip() for c in text.split(",") if c.strip()}
 
 
-def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> dict:
-    raw = src.read_bytes()
-    decoded = None
-    for enc in ("utf-8-sig", "utf-8", "cp932", "utf-16"):
+def decode_text(raw: bytes) -> str:
+    last_error: UnicodeError | None = None
+    for enc in TEXT_ENCODINGS:
         try:
-            decoded = raw.decode(enc)
-            break
-        except UnicodeDecodeError:
-            pass
-    if decoded is None:
-        decoded = raw.decode("utf-8", errors="ignore")
-    rows = list(csv.DictReader(decoded.splitlines()))
-    headers = list(rows[0].keys()) if rows else []
+            return raw.decode(enc)
+        except UnicodeError as exc:
+            last_error = exc
+    raise UnicodeError(f"Unsupported or undecodable CSV encoding; supported encodings: {', '.join(TEXT_ENCODINGS)}") from last_error
+
+
+def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> dict:
+    decoded = decode_text(src.read_bytes())
+    reader = csv.DictReader(decoded.splitlines())
+    headers = list(reader.fieldnames or [])
+    if not headers:
+        raise ValueError("CSV header row is missing or could not be parsed.")
+    rows = list(reader)
     selected = columns or set(headers)
+    unknown = sorted(selected - set(headers))
+    if columns and unknown:
+        raise ValueError("Requested column(s) not found: " + ", ".join(unknown))
     if mode == "drop":
         out_headers = [h for h in headers if h not in selected]
+        if not out_headers:
+            raise ValueError("Refusing to drop every CSV column.")
     else:
         out_headers = headers
     with out.open("w", encoding="utf-8-sig", newline="") as fh:
@@ -55,14 +65,12 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
         for row in rows:
             out_row = dict(row)
             for col in selected:
-                if col not in out_row:
-                    continue
                 if mode == "drop":
                     out_row.pop(col, None)
                 elif mode == "pseudonymize":
-                    out_row[col] = pseudonym(out_row[col], salt)
+                    out_row[col] = pseudonym(out_row.get(col, ""), salt)
                 else:
-                    out_row[col] = mask_value(out_row[col])
+                    out_row[col] = mask_value(out_row.get(col, ""))
             writer.writerow({k: out_row.get(k, "") for k in out_headers})
     return {"rows": len(rows), "columns": len(headers)}
 
@@ -88,7 +96,6 @@ def scrub_core_properties(wb) -> None:
 def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, remove_hidden: bool, remove_comments: bool) -> dict:
     from openpyxl import load_workbook
 
-    # keep_links=False is the supported openpyxl path for dropping cached external-workbook links.
     wb = load_workbook(src, keep_links=False)
     scrub_core_properties(wb)
     removed_sheets = 0
@@ -103,8 +110,13 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
 
         headers = {str(cell.value).strip(): cell.column for cell in ws[1] if cell.value is not None}
         selected = columns or set(headers.keys())
+        unknown = sorted(selected - set(headers.keys()))
+        if columns and unknown:
+            raise ValueError(f"Sheet '{ws.title}' is missing requested column(s): " + ", ".join(unknown))
         if mode == "drop":
             indices = sorted([headers[c] for c in selected if c in headers], reverse=True)
+            if indices and len(indices) >= ws.max_column:
+                raise ValueError(f"Refusing to drop every column from sheet '{ws.title}'.")
             for idx in indices:
                 ws.delete_cols(idx, 1)
         else:
