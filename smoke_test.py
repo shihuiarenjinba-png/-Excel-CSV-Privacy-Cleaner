@@ -23,6 +23,42 @@ with tempfile.TemporaryDirectory() as tmp:
     else:
         raise AssertionError("Undecodable CSV must be rejected")
 
+    binary_csv = root / "binary.csv"
+    binary_csv.write_bytes(b"\x00" * 64)
+    try:
+        clean_csv(binary_csv, root / "binary-out.csv", set(), "mask", "salt")
+    except UnicodeError:
+        pass
+    else:
+        raise AssertionError("Binary-like CSV must be rejected")
+
+    duplicate_csv = root / "duplicate.csv"
+    duplicate_csv.write_text("name,email,email\nAlice,a@example.com,b@example.com\n", encoding="utf-8")
+    try:
+        clean_csv(duplicate_csv, root / "duplicate-out.csv", set(), "mask", "salt")
+    except ValueError as exc:
+        assert "Duplicate" in str(exc)
+    else:
+        raise AssertionError("Duplicate CSV headers must be rejected")
+
+    ragged_csv = root / "ragged.csv"
+    ragged_csv.write_text("name,email\nAlice,a@example.com,EXTRA\n", encoding="utf-8")
+    try:
+        clean_csv(ragged_csv, root / "ragged-out.csv", set(), "mask", "salt")
+    except ValueError as exc:
+        assert "more fields" in str(exc)
+    else:
+        raise AssertionError("CSV rows wider than the header must be rejected")
+
+    overwrite_csv = root / "overwrite.csv"
+    overwrite_csv.write_text("name,email\nAlice,a@example.com\n", encoding="utf-8")
+    try:
+        clean_csv(overwrite_csv, overwrite_csv, {"email"}, "mask", "salt")
+    except ValueError as exc:
+        assert "overwrite" in str(exc).lower()
+    else:
+        raise AssertionError("Original CSV overwrite must be rejected")
+
     xlsx_src = root / "sample.xlsx"
     wb = Workbook()
     wb.properties.creator = "Private Author"
@@ -51,5 +87,18 @@ with tempfile.TemporaryDirectory() as tmp:
     assert stats["removed_external_formulas"] == 1
     assert stats["removed_external_hyperlinks"] == 1
     assert not getattr(out_wb, "_external_links", [])
+
+    duplicate_xlsx = root / "duplicate.xlsx"
+    dup_wb = Workbook()
+    dup_ws = dup_wb.active
+    dup_ws.append(["name", "email", "email"])
+    dup_ws.append(["Alice", "a@example.com", "b@example.com"])
+    dup_wb.save(duplicate_xlsx)
+    try:
+        clean_xlsx(duplicate_xlsx, root / "duplicate-safe.xlsx", set(), "mask", "salt", True, True)
+    except ValueError as exc:
+        assert "Duplicate" in str(exc)
+    else:
+        raise AssertionError("Duplicate XLSX headers must be rejected")
 
 print("Excel CSV Privacy Cleaner smoke test: OK")
