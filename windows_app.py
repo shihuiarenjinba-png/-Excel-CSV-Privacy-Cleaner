@@ -8,6 +8,7 @@ from tkinter import BOTH, END, LEFT, Button, Checkbutton, Entry, Frame, IntVar, 
 
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?81[- ]?)?0?\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}(?!\d)")
+EXTERNAL_FORMULA_RE = re.compile(r"\[[^\]]+\.(?:xls|xlsx|xlsm|xlsb|csv)\]", re.I)
 
 
 def pseudonym(value: object, salt: str) -> str:
@@ -66,17 +67,40 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
     return {"rows": len(rows), "columns": len(headers)}
 
 
+def is_external_formula(value: object) -> bool:
+    if not isinstance(value, str) or not value.startswith("="):
+        return False
+    lower = value.lower()
+    return bool(EXTERNAL_FORMULA_RE.search(value) or "http://" in lower or "https://" in lower or "\\\\" in value)
+
+
+def scrub_core_properties(wb) -> None:
+    props = wb.properties
+    for attr in (
+        "creator", "lastModifiedBy", "title", "subject", "description", "keywords",
+        "category", "contentStatus", "identifier", "language", "version", "revision",
+        "created", "modified", "lastPrinted"
+    ):
+        if hasattr(props, attr):
+            setattr(props, attr, None)
+
+
 def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, remove_hidden: bool, remove_comments: bool) -> dict:
     from openpyxl import load_workbook
-    wb = load_workbook(src)
-    if hasattr(wb, "_external_links"):
-        wb._external_links = []
+
+    # keep_links=False is the supported openpyxl path for dropping cached external-workbook links.
+    wb = load_workbook(src, keep_links=False)
+    scrub_core_properties(wb)
     removed_sheets = 0
+    removed_external_formulas = 0
+    removed_external_hyperlinks = 0
+
     for ws in list(wb.worksheets):
         if remove_hidden and ws.sheet_state != "visible":
             wb.remove(ws)
             removed_sheets += 1
             continue
+
         headers = {str(cell.value).strip(): cell.column for cell in ws[1] if cell.value is not None}
         selected = columns or set(headers.keys())
         if mode == "drop":
@@ -93,15 +117,29 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
                     if cell.value in (None, ""):
                         continue
                     cell.value = pseudonym(cell.value, salt) if mode == "pseudonymize" else mask_value(cell.value)
-        if remove_comments:
-            for row in ws.iter_rows():
-                for cell in row:
-                    if cell.comment is not None:
-                        cell.comment = None
+
+        for row in ws.iter_rows():
+            for cell in row:
+                if remove_comments and cell.comment is not None:
+                    cell.comment = None
+                if is_external_formula(cell.value):
+                    cell.value = "[REMOVED_EXTERNAL_FORMULA]"
+                    removed_external_formulas += 1
+                if cell.hyperlink is not None:
+                    target = getattr(cell.hyperlink, "target", None)
+                    if target and not str(target).startswith("#"):
+                        cell.hyperlink = None
+                        removed_external_hyperlinks += 1
+
     if not wb.worksheets:
         raise ValueError("All worksheets would be removed. Keep at least one visible sheet.")
     wb.save(out)
-    return {"sheets": len(wb.worksheets), "removed_hidden_sheets": removed_sheets}
+    return {
+        "sheets": len(wb.worksheets),
+        "removed_hidden_sheets": removed_sheets,
+        "removed_external_formulas": removed_external_formulas,
+        "removed_external_hyperlinks": removed_external_hyperlinks,
+    }
 
 
 class App:
