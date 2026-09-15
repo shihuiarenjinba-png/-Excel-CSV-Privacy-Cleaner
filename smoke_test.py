@@ -1,6 +1,7 @@
 from pathlib import Path
 import tempfile
 from openpyxl import Workbook, load_workbook
+from openpyxl.comments import Comment
 
 from windows_app import clean_csv, clean_xlsx
 
@@ -15,16 +16,31 @@ with tempfile.TemporaryDirectory() as tmp:
 
     xlsx_src = root / "sample.xlsx"
     wb = Workbook()
+    wb.properties.creator = "Private Author"
+    wb.properties.lastModifiedBy = "Private Editor"
     ws = wb.active
-    ws.append(["name", "email"])
-    ws.append(["Alice", "alice@example.com"])
+    ws.append(["name", "email", "external_formula", "external_link"])
+    ws.append(["Alice", "alice@example.com", "='[secret.xlsx]Sheet1'!A1", "portal"])
+    ws["B2"].comment = Comment("private note", "Private Author")
+    ws["D2"].hyperlink = "https://example.invalid/private/path"
     hidden = wb.create_sheet("Hidden")
     hidden.sheet_state = "hidden"
     wb.save(xlsx_src)
 
     xlsx_out = root / "safe.xlsx"
-    clean_xlsx(xlsx_src, xlsx_out, {"email"}, "pseudonymize", "salt", True, True)
-    out_wb = load_workbook(xlsx_out)
+    stats = clean_xlsx(xlsx_src, xlsx_out, {"email"}, "pseudonymize", "salt", True, True)
+    out_wb = load_workbook(xlsx_out, keep_links=False)
+    out_ws = out_wb.active
+
     assert "Hidden" not in out_wb.sheetnames
-    assert out_wb.active["B2"].value != "alice@example.com"
+    assert out_ws["B2"].value != "alice@example.com"
+    assert out_ws["B2"].comment is None
+    assert out_ws["C2"].value == "[REMOVED_EXTERNAL_FORMULA]"
+    assert out_ws["D2"].hyperlink is None
+    assert out_wb.properties.creator in (None, "")
+    assert out_wb.properties.lastModifiedBy in (None, "")
+    assert stats["removed_external_formulas"] == 1
+    assert stats["removed_external_hyperlinks"] == 1
+    assert not getattr(out_wb, "_external_links", [])
+
 print("Excel CSV Privacy Cleaner smoke test: OK")
