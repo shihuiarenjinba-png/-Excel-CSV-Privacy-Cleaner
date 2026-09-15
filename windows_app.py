@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from tkinter import BOTH, END, LEFT, Button, Checkbutton, Entry, Frame, IntVar, Label, Listbox, StringVar, Tk, filedialog, messagebox
 
@@ -133,10 +134,16 @@ def scrub_core_properties(wb) -> None:
     for attr in (
         "creator", "lastModifiedBy", "title", "subject", "description", "keywords",
         "category", "contentStatus", "identifier", "language", "version", "revision",
-        "created", "modified", "lastPrinted"
     ):
         if hasattr(props, attr):
-            setattr(props, attr, None)
+            setattr(props, attr, "")
+    # OpenPyXL's W3CDTF descriptors cannot serialize None for created or
+    # modified. Use a neutral, deterministic date while removing the source
+    # workbook's identifying timestamps.
+    neutral_date = datetime(1980, 1, 1, tzinfo=timezone.utc)
+    props.created = neutral_date
+    props.modified = neutral_date
+    props.lastPrinted = None
 
 
 def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, remove_hidden: bool, remove_comments: bool) -> dict:

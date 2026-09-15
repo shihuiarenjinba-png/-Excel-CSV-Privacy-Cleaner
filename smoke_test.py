@@ -84,9 +84,11 @@ with tempfile.TemporaryDirectory() as tmp:
     assert out_ws["D2"].hyperlink is None
     assert out_wb.properties.creator in (None, "")
     assert out_wb.properties.lastModifiedBy in (None, "")
+    assert out_wb.properties.created.year == 1980
     assert stats["removed_external_formulas"] == 1
     assert stats["removed_external_hyperlinks"] == 1
     assert not getattr(out_wb, "_external_links", [])
+    out_wb.close()
 
     duplicate_xlsx = root / "duplicate.xlsx"
     dup_wb = Workbook()
