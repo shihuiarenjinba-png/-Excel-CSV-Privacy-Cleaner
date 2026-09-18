@@ -1,5 +1,6 @@
 from pathlib import Path
 import tempfile
+from datetime import datetime, timezone
 from openpyxl import Workbook, load_workbook
 from openpyxl.comments import Comment
 
@@ -63,6 +64,7 @@ with tempfile.TemporaryDirectory() as tmp:
     wb = Workbook()
     wb.properties.creator = "Private Author"
     wb.properties.lastModifiedBy = "Private Editor"
+    wb.properties.created = datetime(2001, 2, 3, tzinfo=timezone.utc)
     ws = wb.active
     ws.append(["name", "email", "external_formula", "external_link"])
     ws.append(["Alice", "alice@example.com", "='[secret.xlsx]Sheet1'!A1", "portal"])
@@ -82,8 +84,9 @@ with tempfile.TemporaryDirectory() as tmp:
     assert out_ws["B2"].comment is None
     assert out_ws["C2"].value == "[REMOVED_EXTERNAL_FORMULA]"
     assert out_ws["D2"].hyperlink is None
-    assert out_wb.properties.creator in (None, "")
+    assert out_wb.properties.creator == "openpyxl"
     assert out_wb.properties.lastModifiedBy in (None, "")
+    assert out_wb.properties.created == datetime(1980, 1, 1)
     assert stats["removed_external_formulas"] == 1
     assert stats["removed_external_hyperlinks"] == 1
     assert not getattr(out_wb, "_external_links", [])

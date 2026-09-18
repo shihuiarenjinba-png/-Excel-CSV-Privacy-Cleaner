@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from tkinter import BOTH, END, LEFT, Button, Checkbutton, Entry, Frame, IntVar, Label, Listbox, StringVar, Tk, filedialog, messagebox
 
@@ -11,6 +12,7 @@ PHONE_RE = re.compile(r"(?<!\d)(?:\+?81[- ]?)?0?\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}(
 EXTERNAL_FORMULA_RE = re.compile(r"\[[^\]]+\.(?:xls|xlsx|xlsm|xlsb|csv)\]", re.I)
 TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp932", "utf-16")
 MODES = {"mask", "pseudonymize", "drop"}
+METADATA_EPOCH = datetime(1980, 1, 1, tzinfo=timezone.utc)
 
 
 def pseudonym(value: object, salt: str) -> str:
@@ -130,10 +132,18 @@ def is_external_formula(value: object) -> bool:
 
 def scrub_core_properties(wb) -> None:
     props = wb.properties
+    # openpyxl requires valid datetimes when serializing core created/modified
+    # properties. A fixed UTC epoch removes source timestamps without making the
+    # generated XLSX unsaveable on current supported openpyxl versions. Current
+    # openpyxl rewrites `modified` to the save time, which also prevents the
+    # source document's value from persisting.
+    for attr in ("created", "modified"):
+        if hasattr(props, attr):
+            setattr(props, attr, METADATA_EPOCH)
     for attr in (
         "creator", "lastModifiedBy", "title", "subject", "description", "keywords",
         "category", "contentStatus", "identifier", "language", "version", "revision",
-        "created", "modified", "lastPrinted"
+        "lastPrinted"
     ):
         if hasattr(props, attr):
             setattr(props, attr, None)
