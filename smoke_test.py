@@ -1,3 +1,5 @@
+import csv
+import io
 from pathlib import Path
 import tempfile
 from datetime import datetime, timezone
@@ -14,6 +16,48 @@ with tempfile.TemporaryDirectory() as tmp:
     clean_csv(csv_src, csv_out, {"email"}, "mask", "salt")
     text = csv_out.read_text(encoding="utf-8-sig")
     assert "alice@example.com" not in text
+
+    # Regression: quoted embedded newlines, commas and quotes in unselected
+    # columns must survive a read/transform/write round trip as cell values.
+    mixed_headers = ["email", "keep_text", "keep_emoji", "keep_zero", "keep_empty", "keep_space"]
+    mixed_row = {
+        "email": "holdout@example.com",
+        "keep_text": 'English, 日本語, "quoted"\nsecond line',
+        "keep_emoji": "沖縄🌺🙂",
+        "keep_zero": "001234",
+        "keep_empty": "",
+        "keep_space": "  preserve surrounding whitespace  ",
+    }
+    for label, encoding in (("utf8", "utf-8"), ("utf8-bom", "utf-8-sig"), ("utf16", "utf-16")):
+        source = root / f"mixed-{label}.csv"
+        buffer = io.StringIO(newline="")
+        writer = csv.DictWriter(buffer, fieldnames=mixed_headers, lineterminator="\n")
+        writer.writeheader()
+        writer.writerow(mixed_row)
+        source.write_bytes(buffer.getvalue().encode(encoding))
+        output = root / f"mixed-{label}-safe.csv"
+        clean_csv(source, output, {"email"}, "mask", "salt")
+        with output.open("r", encoding="utf-8-sig", newline="") as fh:
+            cleaned = next(csv.DictReader(fh))
+        assert cleaned["email"] == "[REDACTED_EMAIL]"
+        for column in mixed_headers[1:]:
+            assert cleaned[column] == mixed_row[column], (label, column, cleaned[column], mixed_row[column])
+
+    cp932_row = dict(mixed_row)
+    cp932_row["keep_emoji"] = "沖縄"
+    cp932_source = root / "mixed-cp932.csv"
+    cp932_buffer = io.StringIO(newline="")
+    cp932_writer = csv.DictWriter(cp932_buffer, fieldnames=mixed_headers, lineterminator="\n")
+    cp932_writer.writeheader()
+    cp932_writer.writerow(cp932_row)
+    cp932_source.write_bytes(cp932_buffer.getvalue().encode("cp932"))
+    cp932_output = root / "mixed-cp932-safe.csv"
+    clean_csv(cp932_source, cp932_output, {"email"}, "mask", "salt")
+    with cp932_output.open("r", encoding="utf-8-sig", newline="") as fh:
+        cp932_cleaned = next(csv.DictReader(fh))
+    assert cp932_cleaned["email"] == "[REDACTED_EMAIL]"
+    for column in mixed_headers[1:]:
+        assert cp932_cleaned[column] == cp932_row[column], ("cp932", column)
 
     bad_csv = root / "undecodable.csv"
     bad_csv.write_bytes(b"\x81")

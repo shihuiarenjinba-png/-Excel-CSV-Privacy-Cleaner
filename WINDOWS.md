@@ -4,6 +4,7 @@
 
 - CSV and XLSX input
 - Column-level `mask`, deterministic `pseudonymize`, or `drop`
+- CSV quoted cells retain embedded newlines, commas, quotes, surrounding whitespace, and unselected values after round-trip processing
 - Original file is never overwritten
 - XLSX hidden-sheet removal
 - XLSX cell-comment removal

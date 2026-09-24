@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -87,7 +88,9 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
         raise ValueError("Mode must be mask, pseudonymize, or drop.")
 
     decoded = decode_text(src.read_bytes())
-    reader = csv.DictReader(decoded.splitlines())
+    # csv.DictReader must receive a newline-aware stream. splitlines() removes
+    # embedded newlines from quoted fields and silently changes unselected data.
+    reader = csv.DictReader(io.StringIO(decoded, newline=""))
     headers = validate_headers(list(reader.fieldnames or []), label="CSV")
     rows: list[dict] = []
     for line_no, row in enumerate(reader, start=2):
