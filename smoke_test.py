@@ -135,6 +135,52 @@ with tempfile.TemporaryDirectory() as tmp:
     assert stats["removed_external_hyperlinks"] == 1
     assert not getattr(out_wb, "_external_links", [])
 
+    # Regression: worksheets may have different schemas. Process matching
+    # columns only and preserve unrelated sheets, values, formulas and formats.
+    heterogeneous = root / "heterogeneous.xlsx"
+    het_wb = Workbook()
+    people = het_wb.active
+    people.title = "People"
+    people.append(["name", "email", "phone", "keep"])
+    people.append(["Alice", "alice@example.com", "090-1234-5678", "unchanged"])
+    orders = het_wb.create_sheet("Orders")
+    orders.append(["product", "amount", "date", "leading_zero", "formula", "link"])
+    orders.append(["Widget", 1234.5, datetime(2026, 9, 24), "001234", "=B2*2", "portal"])
+    orders["B2"].number_format = '#,##0.00'
+    orders["C2"].number_format = 'yyyy-mm-dd'
+    orders["D2"].number_format = '@'
+    orders["F2"].hyperlink = "https://example.invalid/order/1"
+    hidden_heterogeneous = het_wb.create_sheet("Hidden Heterogeneous")
+    hidden_heterogeneous.sheet_state = "hidden"
+    hidden_heterogeneous.append(["email"])
+    hidden_heterogeneous.append(["hidden@example.com"])
+    het_wb.save(heterogeneous)
+
+    heterogeneous_out = root / "heterogeneous-safe.xlsx"
+    het_stats = clean_xlsx(heterogeneous, heterogeneous_out, {"name", "email", "phone"}, "mask", "salt", True, True)
+    het_clean = load_workbook(heterogeneous_out, data_only=False, keep_links=False)
+    assert set(het_clean.sheetnames) == {"People", "Orders"}
+    assert het_clean["People"]["A2"].value != "Alice"
+    assert het_clean["People"]["B2"].value == "[REDACTED_EMAIL]"
+    assert het_clean["People"]["C2"].value == "[REDACTED_PHONE]"
+    assert het_clean["People"]["D2"].value == "unchanged"
+    assert het_clean["Orders"]["A2"].value == "Widget"
+    assert het_clean["Orders"]["B2"].value == 1234.5
+    assert het_clean["Orders"]["B2"].number_format == '#,##0.00'
+    assert het_clean["Orders"]["C2"].value == datetime(2026, 9, 24)
+    assert het_clean["Orders"]["C2"].number_format == 'yyyy-mm-dd'
+    assert het_clean["Orders"]["D2"].value == "001234"
+    assert het_clean["Orders"]["D2"].number_format == '@'
+    assert het_clean["Orders"]["E2"].value == "=B2*2"
+    assert het_clean["Orders"]["E2"].data_type == "f"
+    assert het_clean["Orders"]["F2"].value == "portal"
+    assert het_clean["Orders"]["F2"].hyperlink is None
+    result_by_sheet = {entry["sheet"]: entry for entry in het_stats["sheet_results"]}
+    assert result_by_sheet["People"]["status"] == "processed"
+    assert result_by_sheet["People"]["processed_columns"] == ["email", "name", "phone"]
+    assert result_by_sheet["Orders"]["status"] == "skipped_no_matching_columns"
+    assert result_by_sheet["Orders"]["missing_requested_columns"] == ["email", "name", "phone"]
+
     duplicate_xlsx = root / "duplicate.xlsx"
     dup_wb = Workbook()
     dup_ws = dup_wb.active

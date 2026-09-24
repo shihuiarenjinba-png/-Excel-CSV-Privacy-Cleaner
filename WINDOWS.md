@@ -9,6 +9,8 @@
 - XLSX hidden-sheet removal
 - XLSX cell-comment removal
 - XLSX external-link collection cleared on output
+- Heterogeneous XLSX worksheets are supported: only matching requested columns are transformed, while non-matching worksheets and non-target cells are preserved
+- XLSX results include per-sheet processed/skipped status and missing requested columns
 - Stable pseudonyms using a user-controlled salt
 
 ## Run

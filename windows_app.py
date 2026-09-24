@@ -164,6 +164,7 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
     removed_sheets = 0
     removed_external_formulas = 0
     removed_external_hyperlinks = 0
+    sheet_results: list[dict] = []
 
     for ws in list(wb.worksheets):
         if remove_hidden and ws.sheet_state != "visible":
@@ -178,10 +179,16 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
         else:
             headers = {}
 
-        selected = columns or set(headers.keys())
-        unknown = sorted(selected - set(headers.keys()))
-        if columns and unknown:
-            raise ValueError(f"Sheet '{ws.title}' is missing requested column(s): " + ", ".join(unknown))
+        requested = columns or set(headers.keys())
+        selected = requested & set(headers.keys())
+        missing = sorted(requested - set(headers.keys())) if columns else []
+        sheet_result = {
+            "sheet": ws.title,
+            "status": "processed" if selected else "skipped_no_matching_columns",
+            "processed_columns": sorted(selected),
+            "missing_requested_columns": missing,
+            "rows": max(0, ws.max_row - 1),
+        }
 
         if mode == "drop":
             indices = sorted([headers[c] for c in selected if c in headers], reverse=True)
@@ -212,6 +219,7 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
                     if target and not str(target).startswith("#"):
                         cell.hyperlink = None
                         removed_external_hyperlinks += 1
+        sheet_results.append(sheet_result)
 
     if not wb.worksheets:
         raise ValueError("All worksheets would be removed. Keep at least one visible sheet.")
@@ -221,6 +229,7 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
         "removed_hidden_sheets": removed_sheets,
         "removed_external_formulas": removed_external_formulas,
         "removed_external_hyperlinks": removed_external_hyperlinks,
+        "sheet_results": sheet_results,
     }
 
 
