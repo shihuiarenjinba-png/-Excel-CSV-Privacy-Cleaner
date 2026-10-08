@@ -270,7 +270,7 @@ class App:
         self.listbox.pack(fill=BOTH, expand=True, padx=12, pady=12)
 
     def choose(self):
-        p = filedialog.askopenfilename(title="Choose CSV or XLSX", filetypes=[("Data files", "*.csv *.xlsx"), ("CSV", "*.csv"), ("Excel", "*.xlsx")])
+        p = filedialog.askopenfilename(parent=self.root, title="Choose CSV or XLSX", filetypes=[("Data files", "*.csv *.xlsx"), ("CSV", "*.csv"), ("Excel", "*.xlsx")])
         if not p:
             return
         self.file = Path(p)
@@ -286,7 +286,7 @@ class App:
         ext = self.file.suffix.lower()
         if ext not in {".csv", ".xlsx"}:
             return messagebox.showerror("Privacy Cleaner", "Only CSV and XLSX are supported.")
-        out = filedialog.asksaveasfilename(defaultextension=ext, initialfile=f"{self.file.stem}_safe{ext}", filetypes=[("Output", f"*{ext}")])
+        out = filedialog.asksaveasfilename(parent=self.root, defaultextension=ext, initialfile=f"{self.file.stem}_safe{ext}", filetypes=[("Output", f"*{ext}")])
         if not out:
             return
         try:

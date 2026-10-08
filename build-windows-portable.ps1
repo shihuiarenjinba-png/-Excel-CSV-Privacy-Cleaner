@@ -14,7 +14,12 @@ if ($LASTEXITCODE -ne 0) { throw "dependency installation failed." }
 if ($LASTEXITCODE -ne 0) { throw "bilingual_smoke_test.py failed." }
 & $Python .\language_standard_smoke_test.py
 if ($LASTEXITCODE -ne 0) { throw "language_standard_smoke_test.py failed." }
+& $Python .\smoke_test.py
+if ($LASTEXITCODE -ne 0) { throw "smoke_test.py failed." }
+& $Python .\dialog_parent_smoke_test.py
+if ($LASTEXITCODE -ne 0) { throw "dialog_parent_smoke_test.py failed." }
 & $Python -m PyInstaller --noconfirm --clean --onefile --windowed --name "ExcelCSVPrivacyCleaner" --collect-all openpyxl desktop_entry.py
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }
+Copy-Item -LiteralPath (Join-Path $Root "START_HERE.html") -Destination (Join-Path $Root "dist\START_HERE.html") -Force
 Write-Host "Built: $Root\dist\ExcelCSVPrivacyCleaner.exe"
 Write-Host "Before sale: run SALES_RELEASE_CHECKLIST.md, hidden-sheet/comment/external-link fixtures, metadata checks, JA/EN UI smoke, runtime egress verification, malware scan, Authenticode signing, SHA256."
