@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>はじめに — Excel / CSV Privacy Cleaner</title>
+<style>body{font-family:"Segoe UI",Meiryo,sans-serif;max-width:900px;margin:32px auto;padding:0 22px;line-height:1.7;color:#172033}h1{color:#173f67}h2{margin-top:28px;border-bottom:2px solid #dce7f1}.box,.warn{padding:12px 16px;border-radius:8px}.box{background:#eef7ff}.warn{background:#fff5df;border-left:5px solid #d58a00}code{background:#edf2f6;padding:2px 5px}li{margin:.3em 0}footer{margin-top:30px;color:#667085}</style>
+</head>
+<body>
+<h1>Excel / CSV Privacy Cleaner — はじめに</h1>
+<div class="box">CSV／XLSXの指定列をマスク・仮名化・削除し、元データを上書きせず安全化コピーを作成します。</div>
+<h2>最初にやること</h2>
+<ol>
+<li>EXEを起動しCSVまたはXLSXを選びます。</li>
+<li>対象列名を指定します。</li>
+<li>mask／pseudonymize／dropを選びます。</li>
+<li>保存先を選び実行します。</li>
+<li>出力を再度開き、対象列と非対象列を確認します。</li>
+</ol>
+<h2>入力例</h2>
+<p>
+<code>顧客一覧.csv</code>の <code>email</code> 列をmask。先頭ゼロ、改行、絵文字等を含む非対象列も確認してください。</p>
+<h2>出力されるもの</h2>
+<p>
+<code>元名_safe.csv</code>または<code>元名_safe.xlsx</code>。入力は上書きしません。</p>
+<h2>制限</h2>
+<p>指定していない列の個人情報を自動で全て検出する製品ではありません。formulaや外部リンク等は処理後に確認してください。</p>
+<h2>よくあるエラー</h2>
+<p>列名不一致、無効なmode、対応外形式、文字コード、暗号化・破損、書き込み権限を確認します。</p>
+<h2>対応環境・既知の制限</h2>
+<p>Windows 11 64-bit候補です。Windows 10、125%／150%表示、最終配布EXEのHuman Acceptanceは未検証です。EXEは未署名です。</p>
+<h2>問い合わせ</h2>
+<p>BOOTHの「ショップへのお問い合わせ」が一次窓口です。利用できない場合のみ <a href="mailto:dmzmr37049@yahoo.co.jp">dmzmr37049@yahoo.co.jp</a> を利用してください。購入者限定サポートでは注文確認をお願いする場合があります。</p>
+<footer>Windows 11 64-bit候補／Windows 10・125%・150%未検証／未署名EXE／Sales release: NO</footer>
+</body>
+</html>
+
