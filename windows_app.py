@@ -112,19 +112,26 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
     else:
         out_headers = headers
 
-    with out.open("x", encoding="utf-8-sig", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=out_headers)
-        writer.writeheader()
-        for row in rows:
-            out_row = dict(row)
-            for col in selected:
-                if mode == "drop":
-                    out_row.pop(col, None)
-                elif mode == "pseudonymize":
-                    out_row[col] = pseudonym(out_row.get(col, ""), salt)
-                else:
-                    out_row[col] = mask_value(out_row.get(col, ""))
-            writer.writerow({k: out_row.get(k, "") for k in out_headers})
+    created = False
+    try:
+        with out.open("x", encoding="utf-8-sig", newline="") as fh:
+            created = True
+            writer = csv.DictWriter(fh, fieldnames=out_headers)
+            writer.writeheader()
+            for row in rows:
+                out_row = dict(row)
+                for col in selected:
+                    if mode == "drop":
+                        out_row.pop(col, None)
+                    elif mode == "pseudonymize":
+                        out_row[col] = pseudonym(out_row.get(col, ""), salt)
+                    else:
+                        out_row[col] = mask_value(out_row.get(col, ""))
+                writer.writerow({k: out_row.get(k, "") for k in out_headers})
+    except BaseException:
+        if created:
+            out.unlink(missing_ok=True)
+        raise
     return {"rows": len(rows), "columns": len(headers)}
 
 
