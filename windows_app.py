@@ -4,9 +4,11 @@ import csv
 import hashlib
 import io
 import re
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
-from tkinter import BOTH, END, LEFT, Button, Checkbutton, Entry, Frame, IntVar, Label, Listbox, StringVar, Tk, filedialog, messagebox
+from tkinter import BOTH, END, LEFT, Button, Canvas, Checkbutton, Entry, Frame, IntVar, Label, Listbox, Scrollbar, StringVar, Tk, filedialog, messagebox
+from tkinter import ttk
 
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?81[- ]?)?0?\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}(?!\d)")
@@ -110,7 +112,7 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
     else:
         out_headers = headers
 
-    with out.open("w", encoding="utf-8-sig", newline="") as fh:
+    with out.open("x", encoding="utf-8-sig", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=out_headers)
         writer.writeheader()
         for row in rows:
@@ -223,7 +225,15 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
 
     if not wb.worksheets:
         raise ValueError("All worksheets would be removed. Keep at least one visible sheet.")
-    wb.save(out)
+    created = False
+    try:
+        with out.open("xb") as handle:
+            created = True
+            wb.save(handle)
+    except BaseException:
+        if created:
+            out.unlink(missing_ok=True)
+        raise
     return {
         "sheets": len(wb.worksheets),
         "removed_hidden_sheets": removed_sheets,
@@ -233,72 +243,229 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
     }
 
 
+def available_columns(path: Path) -> list[str]:
+    """Read only headers for the selection UI; never alter the input."""
+    ext = path.suffix.lower()
+    if ext == ".csv":
+        sample = decode_text(path.read_bytes())
+        reader = csv.reader(io.StringIO(sample, newline=""))
+        return validate_headers(next(reader, []), label="CSV")
+    if ext == ".xlsx":
+        from openpyxl import load_workbook
+        wb = load_workbook(path, read_only=True, keep_links=False)
+        try:
+            names = []
+            seen = set()
+            for ws in wb.worksheets:
+                if ws.sheet_state != "visible":
+                    continue
+                first = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), [])
+                if not any(value not in (None, "") for value in first):
+                    continue
+                for name in validate_headers(list(first), label=f"worksheet '{ws.title}'"):
+                    if name not in seen:
+                        names.append(name)
+                        seen.add(name)
+            if not names:
+                raise ValueError("No visible worksheet has a valid header row.")
+            return names
+        finally:
+            wb.close()
+    raise ValueError("Only CSV and XLSX inputs are supported.")
+
+
+def preview_changes(path: Path, columns: set[str], mode: str, salt: str, limit: int = 4) -> list[str]:
+    """Short in-memory illustrative before/after preview; not a security audit."""
+    if not columns:
+        return ["Select at least one column to preview."]
+    rows = []
+    if path.suffix.lower() == ".csv":
+        decoded = decode_text(path.read_bytes())
+        reader = csv.DictReader(io.StringIO(decoded, newline=""))
+        validate_headers(list(reader.fieldnames or []), label="CSV")
+        for row in reader:
+            if None in row:
+                raise ValueError("CSV data has more fields than headers.")
+            rows.append(("CSV", row))
+            if len(rows) >= limit:
+                break
+    else:
+        from openpyxl import load_workbook
+        wb = load_workbook(path, read_only=True, keep_links=False, data_only=False)
+        try:
+            for ws in wb.worksheets:
+                if ws.sheet_state != "visible":
+                    continue
+                values = ws.iter_rows(values_only=True)
+                header = next(values, ())
+                if not any(value not in (None, "") for value in header):
+                    continue
+                names = validate_headers(list(header), label=ws.title)
+                for values_row in values:
+                    rows.append((ws.title, dict(zip(names, values_row))))
+                    if len(rows) >= limit:
+                        break
+                if len(rows) >= limit:
+                    break
+        finally:
+            wb.close()
+    lines = ["Preview only: other sheets, metadata and formulas are not shown here."]
+    for sheet, row in rows:
+        for col in sorted(columns & row.keys()):
+            before = "" if row.get(col) is None else str(row[col])
+            after = "(column removed)" if mode == "drop" else (
+                pseudonym(row[col], salt) if mode == "pseudonymize" else mask_value(row[col])
+            )
+            lines.append(f"[{sheet}] {col}: {before[:65]!r}  →  {after[:65]!r}")
+    if len(lines) == 1:
+        lines.append("No matching data rows in the preview sample.")
+    return lines
+
+
 class App:
     def __init__(self, root: Tk):
         self.root = root
         self.root.title("Excel / CSV Privacy Cleaner — Windows")
-        self.root.geometry("920x650")
+        self.root.geometry("940x720")
         self.file: Path | None = None
-        self.columns = StringVar()
         self.mode = StringVar(value="mask")
-        self.salt = StringVar(value="local-default")
+        self.salt = StringVar(value=secrets.token_hex(16))
         self.remove_hidden = IntVar(value=1)
         self.remove_comments = IntVar(value=1)
+        self.column_vars: dict[str, IntVar] = {}
+        self.advanced_visible = False
 
         head = Frame(root, padx=12, pady=12)
         head.pack(fill="x")
-        Label(head, text="Excel / CSV Privacy Cleaner", font=("Segoe UI", 20, "bold")).pack(anchor="w")
-        Label(head, text="Create a safer copy locally. Original files are never overwritten.").pack(anchor="w")
+        Label(head, text="Excel / CSV Privacy Cleaner", font=("Segoe UI", 19, "bold")).pack(anchor="w")
+        Label(head, text="Select file → check columns → choose method → preview → export a new copy.").pack(anchor="w")
+        toolbar = Frame(root, padx=12)
+        toolbar.pack(fill="x")
+        Button(toolbar, text="1  Choose file", command=self.choose, width=17).pack(side=LEFT)
+        Button(toolbar, text="4  Preview", command=self.preview, width=14).pack(side=LEFT, padx=8)
+        Button(toolbar, text="5  Export copy", command=self.export, width=17).pack(side=LEFT)
 
-        controls = Frame(root, padx=12)
-        controls.pack(fill="x")
-        Button(controls, text="Choose CSV/XLSX", width=18, command=self.choose).pack(side=LEFT)
-        Button(controls, text="Export safer copy", width=18, command=self.export).pack(side=LEFT, padx=8)
+        Label(root, text="2  Check the columns to process (none selected by default)", anchor="w").pack(fill="x", padx=12, pady=(12, 2))
+        column_box = Frame(root, padx=12)
+        column_box.pack(fill="x")
+        self.canvas = Canvas(column_box, height=165, highlightthickness=1)
+        scroll = Scrollbar(column_box, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=scroll.set)
+        self.canvas.pack(side=LEFT, fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+        self.check_area = Frame(self.canvas)
+        self.canvas.create_window((0, 0), window=self.check_area, anchor="nw")
+        self.check_area.bind("<Configure>", lambda _e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
 
-        opts = Frame(root, padx=12, pady=10)
-        opts.pack(fill="x")
-        Label(opts, text="Columns to process (comma separated; blank = all columns):").pack(anchor="w")
-        Entry(opts, textvariable=self.columns).pack(fill="x", pady=(2, 8))
-        Label(opts, text="Mode: mask / pseudonymize / drop").pack(anchor="w")
-        Entry(opts, textvariable=self.mode).pack(fill="x", pady=(2, 8))
-        Label(opts, text="Pseudonym salt (keep stable if you need consistent IDs):").pack(anchor="w")
-        Entry(opts, textvariable=self.salt).pack(fill="x", pady=(2, 8))
-        Checkbutton(opts, text="Remove hidden worksheets (XLSX)", variable=self.remove_hidden).pack(anchor="w")
-        Checkbutton(opts, text="Remove cell comments (XLSX)", variable=self.remove_comments).pack(anchor="w")
+        options = Frame(root, padx=12, pady=9)
+        options.pack(fill="x")
+        Label(options, text="3  Processing method:").pack(side=LEFT)
+        ttk.Combobox(options, textvariable=self.mode,
+                     values=("mask", "pseudonymize", "drop"), state="readonly", width=17).pack(side=LEFT, padx=10)
+        Button(options, text="Advanced options", command=self.toggle_advanced).pack(side=LEFT)
+        self.advanced = Frame(root, padx=12)
+        Label(self.advanced, text="Pseudonym key (keep private; use same key for consistent IDs):").pack(anchor="w")
+        Entry(self.advanced, textvariable=self.salt, show="•").pack(fill="x")
+        Checkbutton(self.advanced, text="Remove hidden worksheets (XLSX)", variable=self.remove_hidden).pack(anchor="w")
+        Checkbutton(self.advanced, text="Remove cell comments (XLSX)", variable=self.remove_comments).pack(anchor="w")
 
+        Label(root, text="Preview and processing results (example rows; verify exported file yourself):").pack(anchor="w", padx=12, pady=(12, 2))
         self.listbox = Listbox(root, font=("Consolas", 10))
-        self.listbox.pack(fill=BOTH, expand=True, padx=12, pady=12)
+        self.listbox.pack(fill=BOTH, expand=True, padx=12, pady=(0, 12))
+        self.listbox.insert(END, "Choose a CSV or XLSX file to begin.")
+
+    def toggle_advanced(self):
+        self.advanced_visible = not self.advanced_visible
+        if self.advanced_visible:
+            self.advanced.pack(fill="x", before=self.listbox)
+        else:
+            self.advanced.pack_forget()
+
+    def selected_columns(self) -> set[str]:
+        return {name for name, flag in self.column_vars.items() if flag.get()}
 
     def choose(self):
-        p = filedialog.askopenfilename(parent=self.root, title="Choose CSV or XLSX", filetypes=[("Data files", "*.csv *.xlsx"), ("CSV", "*.csv"), ("Excel", "*.xlsx")])
+        p = filedialog.askopenfilename(
+            parent=self.root, title="Choose CSV or XLSX",
+            filetypes=[("Data files", "*.csv *.xlsx"), ("CSV", "*.csv"), ("Excel", "*.xlsx")],
+        )
         if not p:
             return
-        self.file = Path(p)
+        candidate = Path(p)
+        try:
+            names = available_columns(candidate)
+            if len(names) > 250:
+                raise ValueError("Over 250 distinct columns: use a smaller input or split it before processing.")
+        except Exception as exc:
+            messagebox.showerror("Cannot read columns", str(exc))
+            return
+        self.file = candidate
+        for widget in self.check_area.winfo_children():
+            widget.destroy()
+        self.column_vars = {}
+        for name in names:
+            state = IntVar(value=0)
+            self.column_vars[name] = state
+            Checkbutton(self.check_area, text=name, variable=state, anchor="w").pack(anchor="w")
         self.listbox.delete(0, END)
-        self.listbox.insert(END, str(self.file))
+        self.listbox.insert(END, f"Selected: {self.file}")
+        self.listbox.insert(END, f"Loaded {len(names)} column labels. Check only those you intend to change.")
+
+    def preview(self):
+        if self.file is None:
+            return messagebox.showinfo("Choose file first", "Select an input file.")
+        selected = self.selected_columns()
+        if not selected:
+            return messagebox.showwarning("No columns selected", "Check one or more column names.")
+        try:
+            lines = preview_changes(self.file, selected, self.mode.get(), self.salt.get())
+            self.listbox.delete(0, END)
+            for line in lines:
+                self.listbox.insert(END, line)
+        except Exception as exc:
+            messagebox.showerror("Preview failed", str(exc))
 
     def export(self):
-        if not self.file:
-            return messagebox.showinfo("Privacy Cleaner", "Choose a file first.")
-        mode = self.mode.get().strip().lower()
+        if self.file is None:
+            return messagebox.showinfo("Choose file first", "Select an input file.")
+        selected = self.selected_columns()
+        if not selected:
+            return messagebox.showwarning("No columns selected", "Check one or more column names.")
+        mode = self.mode.get()
         if mode not in MODES:
-            return messagebox.showerror("Privacy Cleaner", "Mode must be mask, pseudonymize, or drop.")
+            return messagebox.showerror("Invalid method", "Choose mask, pseudonymize or drop.")
+        if mode == "pseudonymize" and not self.salt.get().strip():
+            return messagebox.showerror("Missing key", "Pseudonymization needs a nonempty private key.")
+        if not messagebox.askokcancel(
+            "Review export",
+            f"{len(selected)} selected column(s): {', '.join(sorted(selected)[:8])}"
+            "\nOther columns and workbook content may still contain personal data."
+            "\nWorkbook formulas and hidden structures are not comprehensively certified."
+            "\nContinue to choose a NEW output file?",
+        ):
+            return
         ext = self.file.suffix.lower()
-        if ext not in {".csv", ".xlsx"}:
-            return messagebox.showerror("Privacy Cleaner", "Only CSV and XLSX are supported.")
-        out = filedialog.asksaveasfilename(parent=self.root, defaultextension=ext, initialfile=f"{self.file.stem}_safe{ext}", filetypes=[("Output", f"*{ext}")])
+        out = filedialog.asksaveasfilename(
+            parent=self.root, defaultextension=ext,
+            initialfile=f"{self.file.stem}_safe{ext}", filetypes=[("Output", f"*{ext}")],
+        )
         if not out:
             return
+        destination = Path(out)
+        if destination.exists() or destination.is_symlink():
+            return messagebox.showerror("File exists", "Choose a new output filename; existing files are never replaced.")
         try:
-            cols = parse_columns(self.columns.get())
             if ext == ".csv":
-                stats = clean_csv(self.file, Path(out), cols, mode, self.salt.get())
+                stats = clean_csv(self.file, destination, selected, mode, self.salt.get())
             else:
-                stats = clean_xlsx(self.file, Path(out), cols, mode, self.salt.get(), bool(self.remove_hidden.get()), bool(self.remove_comments.get()))
-            self.listbox.insert(END, f"SAVED {out} | {stats}")
-            messagebox.showinfo("Privacy Cleaner", f"Safer copy saved:\n{out}")
+                stats = clean_xlsx(self.file, destination, selected, mode, self.salt.get(),
+                                   bool(self.remove_hidden.get()), bool(self.remove_comments.get()))
+            if destination.stat().st_size <= 0:
+                raise ValueError("Generated file is empty; do not share.")
+            self.listbox.insert(END, f"CREATED {destination.name} | {stats}")
+            messagebox.showinfo("Export complete", "New copy created. Check the final output before sharing.")
         except Exception as exc:
-            messagebox.showerror("Privacy Cleaner", str(exc))
+            messagebox.showerror("Export failed", str(exc))
 
 
 def main():
