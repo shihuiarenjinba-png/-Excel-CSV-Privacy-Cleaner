@@ -11,6 +11,19 @@ _PATCHED = False
 
 TEXTS = {
     "Excel / CSV Privacy Cleaner": ("Excel / CSV Privacy Cleaner", "Excel / CSVプライバシークリーナー"),
+    "Select file → check columns → choose method → preview → export a new copy.": ("Select file → check columns → choose method → preview → export a new copy.", "ファイル選択 → 列をチェック → 処理方法 → プレビュー → 新しいコピーを出力"),
+    "1  Choose file": ("1  Choose file", "1  ファイルを選択"),
+    "2  Check the columns to process (none selected by default)": ("2  Check the columns to process (none selected by default)", "2  処理する列にチェック（初期状態は未選択）"),
+    "3  Processing method:": ("3  Processing method:", "3  処理方法:"),
+    "4  Preview": ("4  Preview", "4  プレビュー"),
+    "5  Export copy": ("5  Export copy", "5  コピーを出力"),
+    "Advanced options": ("Advanced options", "詳細設定"),
+    "Pseudonym key (keep private; use same key for consistent IDs):": ("Pseudonym key (keep private; use same key for consistent IDs):", "仮名化キー（秘密に保管。同じID対応には同じキーが必要）:"),
+    "Preview and processing results (example rows; verify exported file yourself):": ("Preview and processing results (example rows; verify exported file yourself):", "プレビュー・処理結果（例示。出力ファイルは自身で確認してください）:"),
+    "No columns selected": ("No columns selected", "処理列が未選択"),
+    "Export complete": ("Export complete", "出力完了"),
+    "Review export": ("Review export", "出力内容を確認"),
+
     "Excel / CSV Privacy Cleaner — Windows": ("Excel / CSV Privacy Cleaner — Windows", "Excel / CSVプライバシークリーナー — Windows"),
     "Privacy Cleaner": ("Privacy Cleaner", "プライバシークリーナー"),
     "Create a safer copy locally. Original files are never overwritten.": ("Create a safer copy locally. Original files are never overwritten.", "ローカルで安全化したコピーを作成します。元ファイルは上書きしません。"),
@@ -44,6 +57,15 @@ PHRASES = (
     ("Refusing to drop every column", "全列削除は拒否しました"),
     ("All worksheets would be removed. Keep at least one visible sheet.", "すべてのワークシートが削除対象です。少なくとも1つ表示シートを残してください。"),
     ("Refusing to overwrite the input file", "入力ファイルの上書きを拒否しました"),
+    ("Select an input file.", "入力ファイルを選択してください。"),
+    ("Check one or more column names.", "処理する列を1つ以上チェックしてください。"),
+    ("Other columns and workbook content may still contain personal data.", "未選択列やブック内に個人情報が残る可能性があります。"),
+    ("Workbook formulas and hidden structures are not comprehensively certified.", "数式や隠し構造の完全な安全性は保証されません。"),
+    ("Continue to choose a NEW output file?", "新しい出力ファイルを指定して続行しますか？"),
+    ("Choose a new output filename; existing files are never replaced.", "新しいファイル名を指定してください。既存のファイルは上書きしません。"),
+    ("New copy created. Check the final output before sharing.", "新しいコピーを作成しました。共有前に出力結果を確認してください。"),
+    ("Select file", "ファイル選択"), ("Preview", "プレビュー"),
+    ("Selected:", "選択ファイル:"), ("Loaded", "読み込んだ列数"),
     ("SAVED", "保存済み"),
     ("Safer copy saved:", "安全化コピーを保存しました:"),
     ("ERROR", "エラー"),
@@ -75,7 +97,7 @@ def _patch():
     _PATCHED = True
     original_insert = tk.Listbox.insert
     tk.Listbox.insert = lambda self, index, *items: original_insert(self, index, *(translate(x) for x in items))
-    for name in ("showinfo", "showwarning", "showerror"):
+    for name in ("showinfo", "showwarning", "showerror", "askokcancel"):
         original = getattr(messagebox, name)
         setattr(messagebox, name, lambda title, message, *a, _f=original, **k: _f(translate(title), translate(message), *a, **k))
     for name in ("askopenfilename", "askopenfilenames", "asksaveasfilename", "askdirectory"):
