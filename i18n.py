@@ -18,6 +18,8 @@ TEXTS = {
     "4  Preview": ("4  Preview", "4  プレビュー"),
     "5  Export copy": ("5  Export copy", "5  コピーを出力"),
     "Advanced options": ("Advanced options", "詳細設定"),
+    "Show pseudonym key": ("Show pseudonym key", "仮名化キーを表示"),
+    "mask: partly hide | pseudonymize: ID | drop: remove": ("mask: partly hide | pseudonymize: ID | drop: remove", "mask: 一部を隠す | pseudonymize: 仮名ID | drop: 列削除"),
     "Pseudonym key (keep private; use same key for consistent IDs):": ("Pseudonym key (keep private; use same key for consistent IDs):", "仮名化キー（秘密に保管。同じID対応には同じキーが必要）:"),
     "Preview and processing results (example rows; verify exported file yourself):": ("Preview and processing results (example rows; verify exported file yourself):", "プレビュー・処理結果（例示。出力ファイルは自身で確認してください）:"),
     "No columns selected": ("No columns selected", "処理列が未選択"),
