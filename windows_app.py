@@ -301,6 +301,8 @@ def preview_changes(path: Path, columns: set[str], mode: str, salt: str, limit: 
                 if not any(value not in (None, "") for value in header):
                     continue
                 names = validate_headers(list(header), label=ws.title)
+                if not (set(names) & columns):
+                    continue
                 for values_row in values:
                     rows.append((ws.title, dict(zip(names, values_row))))
                     if len(rows) >= limit:
@@ -334,6 +336,8 @@ class App:
         self.remove_comments = IntVar(value=1)
         self.column_vars: dict[str, IntVar] = {}
         self.advanced_visible = False
+        self.show_key = IntVar(value=0)
+        self.key_entry = None
 
         head = Frame(root, padx=12, pady=12)
         head.pack(fill="x")
@@ -362,10 +366,14 @@ class App:
         Label(options, text="3  Processing method:").pack(side=LEFT)
         ttk.Combobox(options, textvariable=self.mode,
                      values=("mask", "pseudonymize", "drop"), state="readonly", width=17).pack(side=LEFT, padx=10)
+        Label(options, text="mask: partly hide | pseudonymize: ID | drop: remove").pack(side=LEFT)
         Button(options, text="Advanced options", command=self.toggle_advanced).pack(side=LEFT)
         self.advanced = Frame(root, padx=12)
         Label(self.advanced, text="Pseudonym key (keep private; use same key for consistent IDs):").pack(anchor="w")
-        Entry(self.advanced, textvariable=self.salt, show="•").pack(fill="x")
+        self.key_entry = Entry(self.advanced, textvariable=self.salt, show="•")
+        self.key_entry.pack(fill="x")
+        Checkbutton(self.advanced, text="Show pseudonym key", variable=self.show_key,
+                    command=self.toggle_key_visibility).pack(anchor="w")
         Checkbutton(self.advanced, text="Remove hidden worksheets (XLSX)", variable=self.remove_hidden).pack(anchor="w")
         Checkbutton(self.advanced, text="Remove cell comments (XLSX)", variable=self.remove_comments).pack(anchor="w")
 
@@ -373,6 +381,9 @@ class App:
         self.listbox = Listbox(root, font=("Consolas", 10))
         self.listbox.pack(fill=BOTH, expand=True, padx=12, pady=(0, 12))
         self.listbox.insert(END, "Choose a CSV or XLSX file to begin.")
+
+    def toggle_key_visibility(self):
+        self.key_entry.configure(show="" if self.show_key.get() else "•")
 
     def toggle_advanced(self):
         self.advanced_visible = not self.advanced_visible
