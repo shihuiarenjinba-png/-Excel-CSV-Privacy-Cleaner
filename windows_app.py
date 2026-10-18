@@ -270,13 +270,16 @@ def validate_xlsx_edit_scope(wb, columns: set[str], mode: str, remove_hidden: bo
     Most spreadsheet structures are *not* equivalent to a plain data table.
     In particular, delete_cols does not rewrite formula references.
     """
-    edited_sheets: set[str] = set()
+    edited_columns: dict[str, set[int]] = {}
     for ws in wb.worksheets:
         if remove_hidden and ws.sheet_state != "visible":
             continue
-        first_row = {str(cell.value).strip() for cell in ws[1] if cell.value is not None}
-        if first_row & columns:
-            edited_sheets.add(ws.title)
+        matches = {
+            cell.column for cell in ws[1]
+            if cell.value is not None and str(cell.value).strip() in columns
+        }
+        if matches:
+            edited_columns[ws.title] = matches
     for ws in wb.worksheets:
         if remove_hidden and ws.sheet_state != "visible":
             continue
@@ -288,7 +291,7 @@ def validate_xlsx_edit_scope(wb, columns: set[str], mode: str, remove_hidden: bo
                 "images, charts or pivot tables. This version only supports "
                 "simple data worksheets. No file was exported."
             )
-    if mode in {"mask", "pseudonymize"} and edited_sheets:
+    if mode in {"mask", "pseudonymize"} and edited_columns:
         for ws in wb.worksheets:
             if remove_hidden and ws.sheet_state != "visible":
                 continue
@@ -296,7 +299,13 @@ def validate_xlsx_edit_scope(wb, columns: set[str], mode: str, remove_hidden: bo
                 for cell in row:
                     if cell.data_type != "f" or is_external_formula(cell.value):
                         continue
-                    if ws.title in edited_sheets or "!" in str(cell.value):
+                    if ws.title in edited_columns and cell.column in edited_columns[ws.title] and cell.row >= 2:
+                        # This formula is itself selected for replacement.
+                        # Pseudonymize replaces the WHOLE formula, so no broken
+                        # live formula survives. Partial mask is rejected later
+                        # by clean_xlsx with its specific user-facing message.
+                        continue
+                    if ws.title in edited_columns or "!" in str(cell.value):
                         raise ValueError(
                             f"Worksheet {ws.title!r} has formulas that may depend on edited cells. "
                             "This version cannot verify formula dependencies. "
