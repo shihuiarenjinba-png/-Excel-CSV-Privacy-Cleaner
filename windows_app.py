@@ -6,6 +6,7 @@ import io
 import re
 import secrets
 from datetime import datetime, timezone
+from zipfile import ZipFile, BadZipFile
 from pathlib import Path
 from tkinter import BOTH, END, LEFT, Button, Canvas, Checkbutton, Entry, Frame, IntVar, Label, Listbox, Scrollbar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
@@ -16,6 +17,10 @@ EXTERNAL_FORMULA_RE = re.compile(r"\[[^\]]+\.(?:xls|xlsx|xlsm|xlsb|csv)\]", re.I
 TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp932", "utf-16")
 MODES = {"mask", "pseudonymize", "drop"}
 METADATA_EPOCH = datetime(1980, 1, 1, tzinfo=timezone.utc)
+MAX_CSV_BYTES = 25 * 1024 * 1024
+MAX_XLSX_BYTES = 15 * 1024 * 1024
+MAX_XLSX_UNCOMPRESSED = 160 * 1024 * 1024
+MAX_SPREADSHEET_ROWS = 100_000
 
 
 def pseudonym(value: object, salt: str) -> str:
@@ -84,6 +89,31 @@ def validate_headers(raw_headers: list[object], *, label: str) -> list[str]:
     return headers
 
 
+def validate_input_size(path: Path) -> None:
+    """Reject unsupported sizes and suspicious ZIP containers before any GUI/export read."""
+    ext = path.suffix.lower()
+    if ext not in {".csv", ".xlsx"}:
+        raise ValueError("Only CSV and XLSX are supported.")
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("A regular, non-symlink input file is required.")
+    size = path.stat().st_size
+    cap = MAX_CSV_BYTES if ext == ".csv" else MAX_XLSX_BYTES
+    if size <= 0 or size > cap:
+        raise ValueError(f"Input file must be between 1 byte and {cap // (1024 * 1024)} MiB.")
+    if ext == ".xlsx":
+        try:
+            with ZipFile(path) as archive:
+                members = archive.infolist()
+                if len(members) > 10_000:
+                    raise ValueError("Workbook contains too many ZIP entries.")
+                if sum(item.file_size for item in members) > MAX_XLSX_UNCOMPRESSED:
+                    raise ValueError("Expanded workbook is too large for safe local processing.")
+                if any(item.filename.lower().endswith("vbaproject.bin") for item in members):
+                    raise ValueError("Macro-containing spreadsheet is not supported.")
+        except BadZipFile as exc:
+            raise ValueError("XLSX container is damaged.") from exc
+
+
 def csv_formula_risk(value: object) -> bool:
     """Conservatively block spreadsheet-formula-like CSV cells before export.
 
@@ -107,6 +137,7 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
     if mode not in MODES:
         raise ValueError("Mode must be mask, pseudonymize, or drop.")
 
+    validate_input_size(src)
     decoded = decode_text(src.read_bytes())
     # csv.DictReader must receive a newline-aware stream. splitlines() removes
     # embedded newlines from quoted fields and silently changes unselected data.
@@ -118,6 +149,10 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
             raise ValueError(f"CSV row has more fields than the header at line {line_no}.")
         rows.append(row)
 
+    if any(csv_formula_risk(header) for header in headers):
+        raise ValueError("CSV column header could execute as a spreadsheet formula. No file exported.")
+    if len(rows) > MAX_SPREADSHEET_ROWS:
+        raise ValueError("CSV exceeds 100,000 rows; split the file before processing.")
     selected = columns or set(headers)
     unknown = sorted(selected - set(headers))
     if columns and unknown:
@@ -196,6 +231,7 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
     if mode not in MODES:
         raise ValueError("Mode must be mask, pseudonymize, or drop.")
 
+    validate_input_size(src)
     wb = load_workbook(src, keep_links=False)
     scrub_core_properties(wb)
     removed_sheets = 0
@@ -204,6 +240,8 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
     sheet_results: list[dict] = []
 
     for ws in list(wb.worksheets):
+        if ws.max_row > MAX_SPREADSHEET_ROWS + 1:
+            raise ValueError(f"Worksheet {ws.title!r} exceeds 100,000 data rows.")
         if remove_hidden and ws.sheet_state != "visible":
             wb.remove(ws)
             removed_sheets += 1
@@ -285,6 +323,7 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
 
 def available_columns(path: Path) -> list[str]:
     """Read only headers for the selection UI; never alter the input."""
+    validate_input_size(path)
     ext = path.suffix.lower()
     if ext == ".csv":
         sample = decode_text(path.read_bytes())
@@ -318,6 +357,7 @@ def preview_changes(path: Path, columns: set[str], mode: str, salt: str, limit: 
     """Short in-memory illustrative before/after preview; not a security audit."""
     if not columns:
         return ["Select at least one column to preview."]
+    validate_input_size(path)
     rows = []
     if path.suffix.lower() == ".csv":
         decoded = decode_text(path.read_bytes())
