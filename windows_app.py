@@ -92,7 +92,7 @@ def csv_formula_risk(value: object) -> bool:
     """
     if value is None:
         return False
-    content = str(value).lstrip(" \\t\\r\\n")
+    content = str(value).lstrip(" \t\r\n")
     if not content:
         return False
     if content[0] in ("=", "+", "@"):
