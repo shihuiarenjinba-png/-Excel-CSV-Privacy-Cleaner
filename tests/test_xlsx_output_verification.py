@@ -41,6 +41,17 @@ class XlsxOutputVerificationTests(unittest.TestCase):
                 check.close()
             self.assertEqual(src.read_bytes(), before)
 
+    def test_absent_selected_columns_do_not_create_misleading_xlsx(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = self.make_source(root)
+            target = root / "should-not-exist.xlsx"
+            original = source.read_bytes()
+            with self.assertRaisesRegex(ValueError, "No selected columns matched"):
+                clean_xlsx(source, target, {"unavailable"}, "mask", "key", True, True)
+            self.assertFalse(target.exists())
+            self.assertEqual(source.read_bytes(), original)
+
     def test_corrupt_save_is_deleted_after_verification_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
