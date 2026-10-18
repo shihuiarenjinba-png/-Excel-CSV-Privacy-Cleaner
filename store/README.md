@@ -3,7 +3,7 @@
 This directory contains **drafts and locally executable validation tools**, not a completed Store submission or a real MSIX.
 
 ## Business decision
-Primary first-sale candidate: Excel / CSV Privacy Cleaner. Proposed Japanese buy-once test price **¥1,480** (Partner Center market price *not set*). Audience: small-office operators preparing selected CSV/XLSX columns for sharing. Paid value is a simple, explicit, local workflow, not guaranteed anonymization. See `monetization_plan.md` and `listing_ja.md` / `listing_en.md`.
+Primary first-sale candidate: Excel / CSV Privacy Cleaner. Proposed Japanese buy-once test price **¥980** initial experiment (compare with **¥1,480**; Partner Center market price *not set*). Audience: small-office operators preparing selected CSV/XLSX columns for sharing. Paid value is a simple, explicit, local workflow, not guaranteed anonymization. See `monetization_plan.md` and `listing_ja.md` / `listing_en.md`.
 
 ## Sequence to create a Store candidate
 1. Complete automated and real-user GUI tests on a clean Windows 10 and Windows 11 PC; record evidence outside any source-data folder.
