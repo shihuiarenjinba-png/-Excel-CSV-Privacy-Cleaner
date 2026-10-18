@@ -24,6 +24,21 @@ class ExcelFormulaExportTests(unittest.TestCase):
             self.assertFalse(output.exists())
             self.assertEqual(source.read_bytes(), original)
 
+    def test_xlsx_empty_private_key_rejected_before_creating_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            src = root / "input.xlsx"
+            dest = root / "out.xlsx"
+            wb = Workbook()
+            wb.active.append(["name"])
+            wb.active.append([""])
+            wb.save(src)
+            original = src.read_bytes()
+            with self.assertRaisesRegex(ValueError, "nonempty private key"):
+                clean_xlsx(src, dest, {"name"}, "pseudonymize", "   ", True, True)
+            self.assertFalse(dest.exists())
+            self.assertEqual(src.read_bytes(), original)
+
     def test_pseudonymization_does_not_preserve_formula(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
