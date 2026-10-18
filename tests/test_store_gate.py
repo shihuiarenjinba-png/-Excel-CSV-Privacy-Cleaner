@@ -65,5 +65,27 @@ class StoreGateTests(unittest.TestCase):
 
 
 
+    def test_symlinked_evidence_not_accepted_even_inside_trusted_directory(self):
+        with tempfile.TemporaryDirectory() as other:
+            target = Path(other) / "external-proof.txt"
+            target.write_bytes(self.proof.read_bytes())
+            link = self.root / "evidence" / "linked.txt"
+            try:
+                link.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation not permitted by operating system")
+            payload = {"schema_version": 1, "commit_sha": COMMIT,
+                       "gates": {name: dict(self.entry) for name in gate.GATES}}
+            payload["gates"]["functional_tests"]["evidence_file"] = "evidence/linked.txt"
+            self.assertIn("functional_tests", gate.check_evidence(self.root, payload, COMMIT))
+
+    def test_absolute_evidence_path_is_rejected(self):
+        payload = {"schema_version": 1, "commit_sha": COMMIT,
+                   "gates": {name: dict(self.entry) for name in gate.GATES}}
+        payload["gates"]["functional_tests"]["evidence_file"] = str(self.proof.resolve())
+        self.assertIn("functional_tests", gate.check_evidence(self.root, payload, COMMIT))
+
+
+
 if __name__ == "__main__":
     unittest.main()
