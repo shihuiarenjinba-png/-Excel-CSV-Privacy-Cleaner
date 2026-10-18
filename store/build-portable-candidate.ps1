@@ -47,6 +47,7 @@ try {
     if (Test-Path -LiteralPath $Candidate) {
         throw "Refusing to replace existing candidate folder: $Candidate"
     }
+    New-Item -ItemType Directory -Path $CandidateParent -Force -ErrorAction Stop | Out-Null
     New-Item -ItemType Directory -Path $Candidate -ErrorAction Stop | Out-Null
     Copy-Item -LiteralPath $Built -Destination (Join-Path $Candidate 'ExcelCSVPrivacyCleaner.exe') -ErrorAction Stop
     $Guide = Join-Path $Worktree 'START_HERE.html'
