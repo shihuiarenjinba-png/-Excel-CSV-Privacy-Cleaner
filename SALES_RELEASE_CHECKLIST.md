@@ -34,7 +34,7 @@
 
 ## Business gate
 - [x] Competing free PDF/EXIF utilities factored into first-product choice
-- [x] Buy-once price hypothesis (¥1,480) and gross/net scenarios documented
+- [x] Buy-once price hypotheses (¥980 initial; ¥1,480 comparison) and gross/net scenarios documented
 - [ ] Actual Store price confirmed (not presumed supported in exact yen amount)
 - [ ] Real purchase-intent interviews or beta validation
 - [ ] Store listing impression → conversion → refund/support metrics after public release
