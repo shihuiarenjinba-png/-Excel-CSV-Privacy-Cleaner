@@ -8,6 +8,9 @@
 - [ ] Confirm paid customer use case, free competitors, price hypothesis and Microsoft Store name rights; then manually authorize product-name reservation
 - [ ] Do not reserve the name only because source code or test definitions exist. Current registration **HOLD**.
 
+## Current Windows launch blocker (2026-10-18)
+- [ ] **HOLD:** Windows blocked the unsigned portable candidate during `Start-Process` with an application-control policy error. Source SHA `5a11d5e50eed856a8948966a9e0886248b58c615`; EXE hash remains verified. GUI has not run. Identify actual CodeIntegrity/AppLocker/Smart App Control policy before relying on this candidate for GUI acceptance. [Issue #4](https://github.com/shihuiarenjinba-png/-Excel-CSV-Privacy-Cleaner/issues/4), [read-only diagnostic guide](store/WINDOWS_LAUNCH_POLICY_BLOCK_20261018.md). Never weaken Windows security controls to mark PASS.
+
 ## Product and customer acceptance
 - [x] Short path: choose a file → select columns via checkboxes → choose transform → preview → export another file
 - [x] Existing source and export files protected by exclusive-create logic
