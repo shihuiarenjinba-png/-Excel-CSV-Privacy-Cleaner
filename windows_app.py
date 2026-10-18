@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import hmac
 import io
 import re
 from itertools import zip_longest
@@ -25,8 +26,15 @@ MAX_SPREADSHEET_ROWS = 100_000
 
 
 def pseudonym(value: object, salt: str) -> str:
-    raw = f"{salt}|{value}".encode("utf-8", errors="strict")
-    return "USER-" + hashlib.sha256(raw).hexdigest()[:10].upper()
+    """Stable keyed IDs with a 64-bit display digest.
+
+    These are pseudonyms, not irreversible anonymization. Keep the key private.
+    """
+    if not salt.strip():
+        raise ValueError("Pseudonymization requires a nonempty private key.")
+    key = salt.encode("utf-8", errors="strict")
+    raw = str(value).encode("utf-8", errors="strict")
+    return "USER-" + hmac.new(key, raw, hashlib.sha256).hexdigest()[:16].upper()
 
 
 def mask_value(value: object) -> str:
