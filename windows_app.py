@@ -147,10 +147,14 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
     decoded = decode_text(src.read_bytes())
 
     def new_reader():
-        return csv.DictReader(io.StringIO(decoded, newline=""))
+        reader = csv.DictReader(io.StringIO(decoded, newline=""))
+        # Header normalization must apply to the actual row keys as well as
+        # the checkbox labels. Otherwise " email " silently becomes blank.
+        reader.fieldnames = validate_headers(list(reader.fieldnames or []), label="CSV")
+        return reader
 
     reader = new_reader()
-    headers = validate_headers(list(reader.fieldnames or []), label="CSV")
+    headers = list(reader.fieldnames or [])
     if any(csv_formula_risk(header) for header in headers):
         raise ValueError("CSV column header could execute as a spreadsheet formula. No file exported.")
     selected = columns or set(headers)
