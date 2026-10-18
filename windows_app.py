@@ -530,6 +530,32 @@ def preview_changes(path: Path, columns: set[str], mode: str, salt: str, limit: 
     return lines
 
 
+
+def format_export_summary(output: Path, stats: dict, selected: set[str]) -> list[str]:
+    """Customer-readable status. Never imply that unselected sheets were sanitized."""
+    lines = [f"New copy created: {output.name}",
+             f"Selected columns: {len(selected)}"]
+    if output.suffix.lower() == ".csv":
+        lines.append(f"CSV rows processed: {stats.get('rows', 0)}")
+    else:
+        sheets = stats.get("sheet_results", [])
+        changed = [s for s in sheets if s.get("status") == "processed"]
+        skipped = [s for s in sheets if s.get("status") != "processed"]
+        lines.append(f"Worksheets changed: {len(changed)}; not changed: {len(skipped)}")
+        lines.append(f"Hidden worksheets removed: {stats.get('removed_hidden_sheets', 0)}")
+        for sheet in sheets[:15]:
+            sheet_name = str(sheet.get("sheet", ""))
+            processed = ", ".join(sheet.get("processed_columns", []))
+            if sheet.get("status") == "processed":
+                lines.append(f"Changed sheet: {sheet_name} | selected columns: {processed}")
+            else:
+                lines.append(f"Unchanged sheet (no matching columns): {sheet_name}")
+        if len(sheets) > 15:
+            lines.append(f"More sheet statuses: {len(sheets) - 15}; review the exported workbook.")
+    lines.append("Review every output file before sharing; privacy removal is not guaranteed.")
+    return lines
+
+
 class App:
     def __init__(self, root: Tk):
         self.root = root
@@ -694,7 +720,9 @@ class App:
                                    bool(self.remove_hidden.get()), bool(self.remove_comments.get()))
             if destination.stat().st_size <= 0:
                 raise ValueError("Generated file is empty; do not share.")
-            self.listbox.insert(END, f"CREATED {destination.name} | {stats}")
+            self.listbox.delete(0, END)
+            for line in format_export_summary(destination, stats, selected):
+                self.listbox.insert(END, line)
             messagebox.showinfo("Export complete", "New copy created. Check the final output before sharing.")
         except Exception as exc:
             messagebox.showerror("Export failed", str(exc))
