@@ -71,7 +71,7 @@ class CsvIntegrityTests(unittest.TestCase):
             output = root / "out.csv"
             source.write_text("email,notes\na@example.com,unchanged\n", encoding="utf-8")
 
-            class CorruptingWriter(orig):
+            class CorruptingWriter(csv.DictWriter):
                 def writerow(self, rowdict):
                     modified = dict(rowdict)
                     if modified.get("email") not in ("email", None):
