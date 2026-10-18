@@ -69,6 +69,29 @@ class XlsxOutputVerificationTests(unittest.TestCase):
             self.assertFalse(out.exists())
             self.assertEqual(src.read_bytes(), before)
 
+    def test_matching_dimensions_with_changed_saved_cell_is_rejected(self):
+        from openpyxl import load_workbook as actual_loader
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            src = self.make_source(root)
+            out = root / "wrong-cell.xlsx"
+            before = src.read_bytes()
+
+            def fake_reopen(path, *args, **kwargs):
+                if Path(path).resolve() == out.resolve():
+                    kwargs["read_only"] = False
+                    opened = actual_loader(path, *args, **kwargs)
+                    opened["People"]["B2"] = "alice@example.com"
+                    return opened
+                return actual_loader(path, *args, **kwargs)
+
+            with patch("openpyxl.load_workbook", side_effect=fake_reopen):
+                with self.assertRaisesRegex(ValueError, "row 2"):
+                    clean_xlsx(src, out, {"email"}, "mask", "salt", True, True)
+            self.assertFalse(out.exists())
+            self.assertEqual(src.read_bytes(), before)
+
+
 
 if __name__ == "__main__":
     unittest.main()
