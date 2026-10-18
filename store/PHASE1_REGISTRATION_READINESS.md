@@ -35,7 +35,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\store\run-windows-qa.ps1
 
 作業用ブランチから実行する場合は `-ExpectedBranch '実際のブランチ名'` を追加。元ブランチのSHAとの関係を確認し、変更内容と証拠をコミットする。検証スクリプトはローカルテストPASSのみを記録し、実機目視・MSIX・Store認定は自動でPASSにはしない。
 
-テスト後に `store/evidence.template.json` をコピーし、対象SHA、各項目の根拠ファイルの相対パスとSHA256を記入する。製品データは添付しない。証拠が確定したら:
+テスト後に `store/evidence.template.json` を元に、リポジトリ外のローカルな専用証拠フォルダー内で実際の証拠マニフェストを作り、対象SHA、各項目の根拠ファイルの相対パスとSHA256を記入する。`store/GETTING_STARTED_WINDOWS.md`を参照し、個人情報を含む可能性があるログをGitHubにコミットしない。製品データは添付しない。証拠が確定したら:
 
 ```powershell
 py -3 .\store\release_gate.py --stage registration --evidence .\store\actual-evidence.json
