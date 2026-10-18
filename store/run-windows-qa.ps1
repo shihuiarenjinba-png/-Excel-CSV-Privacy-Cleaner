@@ -16,6 +16,8 @@ $branch = ""
 $sha = ""
 $results = @()
 $overallPass = $false
+$failedStep = ""
+$failureDetail = ""
 $venv = Join-Path $env:TEMP ("ExcelCSV-QA-" + $id)
 try {
     $sha = (& git -C $Root rev-parse HEAD 2>&1 | Out-String).Trim()
@@ -45,7 +47,14 @@ try {
         }
         $output | Out-File -LiteralPath $log -Append -Encoding utf8
         $script:results += [ordered]@{name=$label;exit_code=$exit}
-        if ($exit -ne 0) { throw "$label failed ($exit). See $log" }
+        if ($exit -ne 0) {
+            $script:failedStep = $label
+            $script:failureDetail = "Test process exited with code $exit"
+            Write-Host "QA FAILED STEP: $label (exit code $exit)"
+            Write-Host "Relevant error output from the end of the synthetic test log:"
+            Get-Content -LiteralPath $log -Tail 45 | ForEach-Object { Write-Host $_ }
+            throw "$label failed ($exit). See $log"
+        }
     }
     . (Join-Path $Root "build_python.ps1")
     $BasePython = Resolve-BuildPython
@@ -64,7 +73,10 @@ try {
     } finally { Pop-Location }
     $overallPass = $true
 } catch {
+    if (-not $failedStep) { $failedStep = "Setup or orchestration" }
+    if (-not $failureDetail) { $failureDetail = $_.Exception.Message }
     ($_ | Out-String) | Out-File -LiteralPath $log -Append -Encoding utf8
+    Write-Host "QA FAILED: $failedStep. See $log"
 } finally {
     if (Test-Path -LiteralPath $venv) {
         try { Remove-Item -LiteralPath $venv -Recurse -Force -ErrorAction Stop }
@@ -77,7 +89,8 @@ try {
         schema_version=1; product="ExcelCSVPrivacyCleaner"; source_sha=$sha; branch=$branch
         automated_local_tests_pass=$overallPass; human_gui_pass=$false
         msix_install_pass=$false; store_certification_pass=$false
-        test_steps=$results; log_sha256=$hash
+        test_steps=$results; failed_step=$failedStep
+        failure_detail=$failureDetail; log_sha256=$hash
         created_utc=(Get-Date).ToUniversalTime().ToString("o")
         scope="Synthetic tests only; no Store release approval."
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportFile -Encoding UTF8
