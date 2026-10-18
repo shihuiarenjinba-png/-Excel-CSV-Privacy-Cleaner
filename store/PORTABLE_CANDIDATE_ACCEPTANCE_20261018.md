@@ -5,6 +5,7 @@
 - ユーザーが報告した構築元のソースSHA: `5a11d5e50eed856a8948966a9e0886248b58c615`
 - ユーザーが報告したEXE SHA256: `9a81e3a7deb5d8048cde49b164bf0596344469644a1e12c57a06281fc6010962`
 - ビルド処理は自動テスト成功後にのみ起動する設計。Windowsから結果の文字列が出ているため、**当該ソース版ではローカル自動QAとポータブル候補生成が成功したと合理的に判断できる**。ただし、現物のEXEとログはGitHub側にはなく、第三者による再検証・GUI実機受入は未実施。
+- **追加検証 PASS（ユーザーのWindows実行報告）:** `store/review-portable-candidate.ps1` が `PORTABLE EXE INTEGRITY: PASS` と表示し、ビルド時の `candidate-manifest.json` と現物EXEのSHA256が一致した。確認した容量は `11,982,739` バイト。Authenticodeは `NotSigned` で、当初から署名していない検証用ポータブルEXEの状態と整合する。これを**マルウェア・安全性・Windows GUI・Store適合の合格と誤認しない**。
 - 現在の判定: **登録HOLD、販売HOLD。** 既存の候補EXEを改変・削除・再署名しない。
 
 ## まずEXEの完全性を読むだけで検証
