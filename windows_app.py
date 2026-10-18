@@ -188,7 +188,13 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
                 if mode == "drop":
                     out_row.pop(col, None)
                 elif mode == "pseudonymize":
-                    out_row[col] = pseudonym(out_row.get(col, ""), salt)
+                    original_value = out_row.get(col)
+                    # Missing/blank values are not people. Pseudonymizing them
+                    # would invent nonempty IDs and corrupt downstream counts.
+                    out_row[col] = (
+                        "" if original_value in (None, "")
+                        else pseudonym(original_value, salt)
+                    )
                 else:
                     out_row[col] = mask_value(out_row.get(col, ""))
             for column in out_headers:
