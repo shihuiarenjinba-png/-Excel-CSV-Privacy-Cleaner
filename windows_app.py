@@ -9,7 +9,7 @@ import secrets
 from datetime import datetime, timezone
 from zipfile import ZipFile, BadZipFile
 from pathlib import Path
-from tkinter import BOTH, END, LEFT, Button, Canvas, Checkbutton, Entry, Frame, IntVar, Label, Listbox, Scrollbar, StringVar, Tk, filedialog, messagebox
+from tkinter import BOTH, END, LEFT, Button, Canvas, Checkbutton, Entry, Frame, IntVar, Label, Listbox, Radiobutton, Scrollbar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
 
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
@@ -469,11 +469,17 @@ class App:
 
         options = Frame(root, padx=12, pady=9)
         options.pack(fill="x")
-        Label(options, text="3  Processing method:").pack(side=LEFT)
-        ttk.Combobox(options, textvariable=self.mode,
-                     values=("mask", "pseudonymize", "drop"), state="readonly", width=17).pack(side=LEFT, padx=10)
-        Label(options, text="mask: partly hide | pseudonymize: ID | drop: remove").pack(side=LEFT)
-        Button(options, text="Advanced options", command=self.toggle_advanced).pack(side=LEFT)
+        Label(options, text="3  Processing method:").pack(anchor="w")
+        mode_row = Frame(options)
+        mode_row.pack(fill="x")
+        for description, value in (
+            ("Mask (hide values)", "mask"),
+            ("Pseudonymize (ID)", "pseudonymize"),
+            ("Drop (remove columns)", "drop"),
+        ):
+            Radiobutton(mode_row, text=description, variable=self.mode,
+                        value=value, anchor="w").pack(side=LEFT, padx=(0, 12))
+        Button(options, text="Advanced options", command=self.toggle_advanced).pack(anchor="w")
         self.advanced = Frame(root, padx=12)
         Label(self.advanced, text="Pseudonym key (keep private; use same key for consistent IDs):").pack(anchor="w")
         self.key_entry = Entry(self.advanced, textvariable=self.salt, show="•")
