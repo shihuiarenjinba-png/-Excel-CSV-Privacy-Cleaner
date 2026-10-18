@@ -1,6 +1,8 @@
 """Regression: normalized CSV headings, preflight-before-output, limited memory."""
 import csv
 import tempfile
+from unittest.mock import patch
+import windows_app
 import unittest
 from pathlib import Path
 
@@ -60,6 +62,41 @@ class CsvIntegrityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "nonempty"):
                 clean_csv(source, out, {"name"}, "pseudonymize", " ")
             self.assertFalse(out.exists())
+
+
+    def test_output_reopen_detects_corrupt_writer_and_removes_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "input.csv"
+            output = root / "out.csv"
+            source.write_text("email,notes\\na@example.com,unchanged\\n", encoding="utf-8")
+            orig = csv.DictWriter
+
+            class CorruptingWriter(orig):
+                def writerow(self, rowdict):
+                    modified = dict(rowdict)
+                    if modified.get("email") not in ("email", None):
+                        modified["notes"] = "incorrect"
+                    return super().writerow(modified)
+
+            with patch.object(windows_app.csv, "DictWriter", CorruptingWriter):
+                with self.assertRaisesRegex(ValueError, "CSV output verification failed"):
+                    clean_csv(source, output, {"email"}, "mask", "salt")
+            self.assertFalse(output.exists())
+            self.assertEqual(source.read_text(encoding="utf-8"),
+                             "email,notes\\na@example.com,unchanged\\n")
+
+    def test_missing_csv_field_exports_empty_value_without_losing_other_columns(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source.csv"
+            output = root / "output.csv"
+            source.write_text("email,notes,extra\\na@example.com,unchanged\\n", encoding="utf-8")
+            clean_csv(source, output, {"email"}, "mask", "key")
+            with output.open(encoding="utf-8-sig", newline="") as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual(rows[0]["notes"], "unchanged")
+            self.assertEqual(rows[0]["extra"], "")
 
 
 if __name__ == "__main__":
