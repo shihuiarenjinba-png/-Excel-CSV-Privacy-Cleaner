@@ -242,6 +242,11 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
                     cell = ws.cell(row=row, column=idx)
                     if cell.value in (None, ""):
                         continue
+                    if mode == "mask" and isinstance(cell.value, str) and cell.value.startswith("="):
+                        raise ValueError(
+                            f"Selected formula cell {ws.title}!{cell.coordinate} cannot be partially masked. "
+                            "Use pseudonymize/drop or remove the formula before exporting."
+                        )
                     cell.value = pseudonym(cell.value, salt) if mode == "pseudonymize" else mask_value(cell.value)
 
         for row in ws.iter_rows():
