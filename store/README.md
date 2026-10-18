@@ -5,6 +5,10 @@ This directory contains **drafts and locally executable validation tools**, not 
 ## Business decision
 Primary first-sale candidate: Excel / CSV Privacy Cleaner. Proposed Japanese buy-once test price **¥980** initial experiment (compare with **¥1,480**; Partner Center market price *not set*). Audience: small-office operators preparing selected CSV/XLSX columns for sharing. Paid value is a simple, explicit, local workflow, not guaranteed anonymization. See `monetization_plan.md` and `listing_ja.md` / `listing_en.md`.
 
+## Human acceptance before a product-frame reservation
+
+Follow [USER_ACCEPTANCE_SCENARIOS.md](USER_ACCEPTANCE_SCENARIOS.md) with synthetic data on the actual unsigned candidate. Check a beginner's CSV flow, workbook multi-sheet status, unsupported formula/complex structure refusal, HMAC pseudonym blanks, bad-file recovery, Japanese/English, DPI and keyboard navigation. Record OS, product SHA, errors and evidence locally. The scripts are prepared, but their latest revision has NOT been verified as passing on Windows.
+
 ## Current safety and size restrictions
 
 Complex XLSX sheets with tables, merged cells, embedded charts/images, or pivot tables are now refused at preview/export; column drops with formulas/named ranges and transformations with uncertain formula dependencies are also rejected. The application does **not** attempt to rewrite formulas or structural references. Empty CSV values stay blank when pseudonymized. The current candidate needs a NEW Windows regression run after these source changes.
