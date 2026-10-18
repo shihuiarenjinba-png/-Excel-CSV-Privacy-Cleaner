@@ -32,10 +32,13 @@ class XlsxOutputVerificationTests(unittest.TestCase):
             before = src.read_bytes()
             stats = clean_xlsx(src, out, {"email"}, "mask", "salt", True, True)
             self.assertEqual(stats["sheets"], 2)
-            with load_workbook(out, read_only=True) as check:
+            check = load_workbook(out, read_only=True)
+            try:
                 self.assertEqual(check.sheetnames, ["People", "Other"])
                 self.assertEqual(check["People"]["B2"].value, "[REDACTED_EMAIL]")
                 self.assertEqual(check["Other"]["A2"].value, 4)
+            finally:
+                check.close()
             self.assertEqual(src.read_bytes(), before)
 
     def test_corrupt_save_is_deleted_after_verification_fails(self):
