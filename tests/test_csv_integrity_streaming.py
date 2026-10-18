@@ -53,6 +53,19 @@ class CsvIntegrityTests(unittest.TestCase):
             self.assertFalse(out.exists())
             self.assertEqual(src.read_bytes(), original)
 
+    def test_pseudonymization_preserves_missing_and_empty_values(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "input.csv"
+            output = root / "output.csv"
+            source.write_text("email,notes\nalice@example.com,present\n,empty\n", encoding="utf-8")
+            clean_csv(source, output, {"email"}, "pseudonymize", "secret-key")
+            with output.open("r", encoding="utf-8-sig", newline="") as file:
+                rows = list(csv.DictReader(file))
+            self.assertTrue(rows[0]["email"].startswith("USER-"))
+            self.assertEqual(rows[1]["email"], "")
+            self.assertEqual(rows[1]["notes"], "empty")
+
     def test_empty_pseudonym_key_refused_even_without_gui(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
