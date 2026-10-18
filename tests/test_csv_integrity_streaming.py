@@ -69,8 +69,7 @@ class CsvIntegrityTests(unittest.TestCase):
             root = Path(temp)
             source = root / "input.csv"
             output = root / "out.csv"
-            source.write_text("email,notes\\na@example.com,unchanged\\n", encoding="utf-8")
-            orig = csv.DictWriter
+            source.write_text("email,notes\na@example.com,unchanged\n", encoding="utf-8")
 
             class CorruptingWriter(orig):
                 def writerow(self, rowdict):
@@ -84,14 +83,14 @@ class CsvIntegrityTests(unittest.TestCase):
                     clean_csv(source, output, {"email"}, "mask", "salt")
             self.assertFalse(output.exists())
             self.assertEqual(source.read_text(encoding="utf-8"),
-                             "email,notes\\na@example.com,unchanged\\n")
+                             "email,notes\na@example.com,unchanged\n")
 
     def test_missing_csv_field_exports_empty_value_without_losing_other_columns(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             source = root / "source.csv"
             output = root / "output.csv"
-            source.write_text("email,notes,extra\\na@example.com,unchanged\\n", encoding="utf-8")
+            source.write_text("email,notes,extra\na@example.com,unchanged\n", encoding="utf-8")
             clean_csv(source, output, {"email"}, "mask", "key")
             with output.open(encoding="utf-8-sig", newline="") as file:
                 rows = list(csv.DictReader(file))
