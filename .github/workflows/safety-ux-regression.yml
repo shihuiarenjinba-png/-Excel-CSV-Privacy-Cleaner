@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Dependencies
-        run: python -m pip install "openpyxl>=3.1,<4"
+        run: python -m pip install -r requirements-windows.lock.txt
       - name: Compile and check syntax
         run: python -m compileall -q windows_app.py i18n.py smoke_test.py gui_smoke_test.py tests
       - name: Existing functional regression
@@ -28,5 +28,9 @@ jobs:
         run: python -m unittest discover -s tests -p "test_*.py" -v
       - name: Japanese and English UI smoke
         run: python bilingual_smoke_test.py
+      - name: Language preference and UI dialog-parent checks
+        run: |
+          python language_standard_smoke_test.py
+          python dialog_parent_smoke_test.py
       - name: Synthetic Tk GUI choose-preview-export smoke (not a visual acceptance)
         run: python gui_smoke_test.py
