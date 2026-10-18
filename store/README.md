@@ -9,6 +9,10 @@ Primary first-sale candidate: Excel / CSV Privacy Cleaner. Proposed Japanese buy
 
 CSV supports up to 25 MiB and 100,000 rows. XLSX accepts up to 15 MiB compressed, 160 MiB expanded and 100,000 rows per sheet. These caps must be shown to prospective customers; they are not a claim that the product processes unlimited datasets. Formula-shaped CSV cells or headers can block export. This is deliberately conservative: never silently change unselected cells.
 
+## First time on Windows: source files are NOT auto-downloaded
+
+**If PowerShell is at `C:\\Users\\<account>` and says `-File .\\store\\run-windows-qa.ps1` does not exist, no tests ran.** Read [GETTING_STARTED_WINDOWS.md](GETTING_STARTED_WINDOWS.md) to clone the improvement branch into a new independent folder, then run the QA script by its correct absolute path. Do not assume saving code to GitHub has written files onto the Windows PC. Never modify or reset an unrelated existing checkout.
+
 ## Local Windows proof when hosted runners fail
 
 Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\store\run-windows-qa.ps1` from a clean checked-out `improve/simple-column-ui-20261018` branch. It creates unique QA logs and a result JSON under `Documents\ExcelCSVPrivacyCleaner-QA`; it never marks GUI/MSIX/Store certification as passed. If `python` or pinned dependencies cannot run, the evidence records HOLD. The generated report is not customer-facing and should not include personal data.
