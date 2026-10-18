@@ -54,11 +54,10 @@ try {
         }
         Copy-Item -LiteralPath $Source -Destination (Join-Path (Join-Path $Stage "Assets") $name)
     }
-    $Escape = [System.Security.SecurityElement]
-    $SafeIdentity = $Escape::Escape($IdentityName)
-    $SafePublisher = $Escape::Escape($Publisher)
-    $SafePublisherName = $Escape::Escape($PublisherDisplayName)
-    $SafeDisplay = $Escape::Escape($DisplayName)
+    $SafeIdentity = [System.Security.SecurityElement]::Escape($IdentityName)
+    $SafePublisher = [System.Security.SecurityElement]::Escape($Publisher)
+    $SafePublisherName = [System.Security.SecurityElement]::Escape($PublisherDisplayName)
+    $SafeDisplay = [System.Security.SecurityElement]::Escape($DisplayName)
     $Manifest = @"
 <?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
