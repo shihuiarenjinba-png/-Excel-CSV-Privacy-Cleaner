@@ -270,6 +270,13 @@ def validate_xlsx_edit_scope(wb, columns: set[str], mode: str, remove_hidden: bo
     Most spreadsheet structures are *not* equivalent to a plain data table.
     In particular, delete_cols does not rewrite formula references.
     """
+    edited_sheets: set[str] = set()
+    for ws in wb.worksheets:
+        if remove_hidden and ws.sheet_state != "visible":
+            continue
+        first_row = {str(cell.value).strip() for cell in ws[1] if cell.value is not None}
+        if first_row & columns:
+            edited_sheets.add(ws.title)
     for ws in wb.worksheets:
         if remove_hidden and ws.sheet_state != "visible":
             continue
@@ -281,7 +288,26 @@ def validate_xlsx_edit_scope(wb, columns: set[str], mode: str, remove_hidden: bo
                 "images, charts or pivot tables. This version only supports "
                 "simple data worksheets. No file was exported."
             )
+    if mode in {"mask", "pseudonymize"} and edited_sheets:
+        for ws in wb.worksheets:
+            if remove_hidden and ws.sheet_state != "visible":
+                continue
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.data_type != "f" or is_external_formula(cell.value):
+                        continue
+                    if ws.title in edited_sheets or "!" in str(cell.value):
+                        raise ValueError(
+                            f"Worksheet {ws.title!r} has formulas that may depend on edited cells. "
+                            "This version cannot verify formula dependencies. "
+                            "Use a formulas-free table copy or CSV. No file was exported."
+                        )
     if mode == "drop":
+        if wb.defined_names:
+            raise ValueError(
+                "Named ranges can break when columns are dropped. "
+                "Remove named ranges in a copy or use CSV. No file was exported."
+            )
         for ws in wb.worksheets:
             if remove_hidden and ws.sheet_state != "visible":
                 continue
