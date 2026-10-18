@@ -1,6 +1,9 @@
 # Local Windows validation fallback. Does not authorize Store release.
 [CmdletBinding()]
-param([string]$EvidenceParent = (Join-Path $env:USERPROFILE "Documents\ExcelCSVPrivacyCleaner-QA"))
+param(
+    [string]$EvidenceParent = (Join-Path $env:USERPROFILE "Documents\ExcelCSVPrivacyCleaner-QA"),
+    [string]$ExpectedBranch = "improve/simple-column-ui-20261018"
+)
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -20,8 +23,8 @@ try {
         throw "A real Git checkout with commit SHA is required."
     }
     $branch = (& git -C $Root branch --show-current 2>&1 | Out-String).Trim()
-    if ($branch -ne "improve/simple-column-ui-20261018") {
-        throw "Wrong branch: $branch"
+    if (-not $ExpectedBranch.Trim() -or $branch -ne $ExpectedBranch) {
+        throw "Wrong branch: $branch (expected $ExpectedBranch). Specify -ExpectedBranch for a derived QA branch."
     }
     $dirty = & git -C $Root status --porcelain --untracked-files=no
     if ($LASTEXITCODE -ne 0 -or $dirty) {
