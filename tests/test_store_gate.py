@@ -53,5 +53,17 @@ class StoreGateTests(unittest.TestCase):
         self.assertIn("msix_package", gate.check_evidence(self.root, payload, COMMIT))
 
 
+    def test_registration_gate_requires_quality_but_not_reserved_store_identity(self):
+        payload = {"schema_version": 1, "commit_sha": COMMIT,
+                   "gates": {name: {"status": "TODO"} for name in gate.GATES}}
+        for name in gate.REGISTRATION_GATES:
+            payload["gates"][name] = dict(self.entry)
+        self.assertEqual(gate.check_evidence(
+            self.root, payload, COMMIT, required_gates=gate.REGISTRATION_GATES), [])
+        self.assertIn("store_identity", gate.check_evidence(self.root, payload, COMMIT))
+        self.assertIn("msix_package", gate.check_evidence(self.root, payload, COMMIT))
+
+
+
 if __name__ == "__main__":
     unittest.main()
