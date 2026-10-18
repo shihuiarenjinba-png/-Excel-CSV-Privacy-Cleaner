@@ -133,31 +133,30 @@ def csv_formula_risk(value: object) -> bool:
 
 
 def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> dict:
+    """Preflight every CSV cell, then write without keeping row dictionaries in RAM.
+
+    The second pass uses the exact same decoded text, so the output cannot differ
+    from the inspected source due to a concurrent change on disk.
+    """
     ensure_distinct_paths(src, out)
     if mode not in MODES:
         raise ValueError("Mode must be mask, pseudonymize, or drop.")
-
+    if mode == "pseudonymize" and not salt.strip():
+        raise ValueError("Pseudonymization requires a nonempty private key.")
     validate_input_size(src)
     decoded = decode_text(src.read_bytes())
-    # csv.DictReader must receive a newline-aware stream. splitlines() removes
-    # embedded newlines from quoted fields and silently changes unselected data.
-    reader = csv.DictReader(io.StringIO(decoded, newline=""))
-    headers = validate_headers(list(reader.fieldnames or []), label="CSV")
-    rows: list[dict] = []
-    for line_no, row in enumerate(reader, start=2):
-        if None in row:
-            raise ValueError(f"CSV row has more fields than the header at line {line_no}.")
-        rows.append(row)
 
+    def new_reader():
+        return csv.DictReader(io.StringIO(decoded, newline=""))
+
+    reader = new_reader()
+    headers = validate_headers(list(reader.fieldnames or []), label="CSV")
     if any(csv_formula_risk(header) for header in headers):
         raise ValueError("CSV column header could execute as a spreadsheet formula. No file exported.")
-    if len(rows) > MAX_SPREADSHEET_ROWS:
-        raise ValueError("CSV exceeds 100,000 rows; split the file before processing.")
     selected = columns or set(headers)
     unknown = sorted(selected - set(headers))
     if columns and unknown:
         raise ValueError("Requested column(s) not found: " + ", ".join(unknown))
-
     if mode == "drop":
         out_headers = [h for h in headers if h not in selected]
         if not out_headers:
@@ -165,37 +164,47 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
     else:
         out_headers = headers
 
-    transformed_rows = []
-    for row_index, row in enumerate(rows, start=2):
-        out_row = dict(row)
-        for col in selected:
-            if mode == "drop":
-                out_row.pop(col, None)
-            elif mode == "pseudonymize":
-                out_row[col] = pseudonym(out_row.get(col, ""), salt)
-            else:
-                out_row[col] = mask_value(out_row.get(col, ""))
-        for column in out_headers:
-            if csv_formula_risk(out_row.get(column)):
-                raise ValueError(
-                    f"Possible spreadsheet formula in output row {row_index}, column '{column}'. "
-                    "Select and pseudonymize/drop that column or remove the risky value. "
-                    "No file was exported."
-                )
-        transformed_rows.append({k: out_row.get(k, "") for k in out_headers})
+    def transformed():
+        for row_index, row in enumerate(new_reader(), start=2):
+            if row_index - 1 > MAX_SPREADSHEET_ROWS:
+                raise ValueError("CSV exceeds 100,000 rows; split the file before processing.")
+            if None in row:
+                raise ValueError(f"CSV row has more fields than the header at line {row_index}.")
+            out_row = dict(row)
+            for col in selected:
+                if mode == "drop":
+                    out_row.pop(col, None)
+                elif mode == "pseudonymize":
+                    out_row[col] = pseudonym(out_row.get(col, ""), salt)
+                else:
+                    out_row[col] = mask_value(out_row.get(col, ""))
+            for column in out_headers:
+                if csv_formula_risk(out_row.get(column)):
+                    raise ValueError(
+                        f"Possible spreadsheet formula in output row {row_index}, column '{column}'. "
+                        "Select and pseudonymize/drop that column or remove the risky value. "
+                        "No file was exported."
+                    )
+            yield {k: out_row.get(k, "") for k in out_headers}
+
+    # Check all rows BEFORE opening a new output. Fail closed on late-row errors.
+    count = 0
+    for _row in transformed():
+        count += 1
+
     created = False
     try:
         with out.open("x", encoding="utf-8-sig", newline="") as fh:
             created = True
             writer = csv.DictWriter(fh, fieldnames=out_headers)
             writer.writeheader()
-            for out_row in transformed_rows:
+            for out_row in transformed():
                 writer.writerow(out_row)
     except BaseException:
         if created:
             out.unlink(missing_ok=True)
         raise
-    return {"rows": len(rows), "columns": len(headers)}
+    return {"rows": count, "columns": len(headers)}
 
 
 def is_external_formula(value: object) -> bool:
