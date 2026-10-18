@@ -19,7 +19,7 @@ Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\store\run-windows-qa.
 
 ## Product-frame readiness gate (before reserving a name)
 
-See [PHASE1_REGISTRATION_READINESS.md](PHASE1_REGISTRATION_READINESS.md). Once test/GUI/privacy/license evidence exists for the exact commit, run `py -3 .\store\release_gate.py --stage registration --evidence .\store\actual-evidence.json`. This checks five pre-registration quality gates **without requiring a Partner Center identity or MSIX**. Passing the evidence check is not automatic permission to publish or reserve a name; verify name rights, timing and customer value manually. Current registration decision: **HOLD**.
+See [PHASE1_REGISTRATION_READINESS.md](PHASE1_REGISTRATION_READINESS.md). QA results are saved locally outside the Git checkout. The release gate supports `--evidence-root` to read their hashes from a private local evidence directory, without copying logs into the repository. **Do not commit logs containing user paths or confidential data.** Once test/GUI/privacy/license evidence exists for the exact commit, run `py -3 .\store\release_gate.py --stage registration --evidence .\store\actual-evidence.json`. This checks five pre-registration quality gates **without requiring a Partner Center identity or MSIX**. Passing the evidence check is not automatic permission to publish or reserve a name; verify name rights, timing and customer value manually. Current registration decision: **HOLD**.
 
 ## Sequence to create a Store candidate
 1. Complete automated and real-user GUI tests on a clean Windows 10 and Windows 11 PC; record evidence outside any source-data folder.
