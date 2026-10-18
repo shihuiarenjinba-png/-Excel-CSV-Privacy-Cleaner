@@ -21,6 +21,21 @@ Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\store\run-windows-qa.
 
 See [PHASE1_REGISTRATION_READINESS.md](PHASE1_REGISTRATION_READINESS.md). QA results are saved locally outside the Git checkout. The release gate supports `--evidence-root` to read their hashes from a private local evidence directory, without copying logs into the repository. **Do not commit logs containing user paths or confidential data.** Once test/GUI/privacy/license evidence exists for the exact commit, run `py -3 .\store\release_gate.py --stage registration --evidence .\store\actual-evidence.json`. This checks five pre-registration quality gates **without requiring a Partner Center identity or MSIX**. Passing the evidence check is not automatic permission to publish or reserve a name; verify name rights, timing and customer value manually. Current registration decision: **HOLD**.
 
+## One-command tested portable candidate (not Store submission)
+
+After pulling the latest improvement branch into the **separate validation clone**, run:
+
+```powershell
+$repo = Join-Path $HOME 'ExcelCSVPrivacyCleaner-Validation\source'
+git -C $repo status --short
+git -C $repo pull --ff-only
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'store\verify-and-build.ps1')
+```
+
+The script first runs the pinned regression suite. **Only when it passes** does it build in an isolated temporary archive, without deleting the user's old application, repository, EXE or MSIX. It saves a new unique unsigned EXE + source-SHA256 manifest under `Documents\ExcelCSVPrivacyCleaner-Candidates`. The candidate is for **GUI/egress/AV QA**, not a Store MSIX and not release authorization. Product registration remains HOLD until the remaining manual gates are met. Do not upload this EXE as an MSIX.
+
+The new keyed pseudonym implementation uses HMAC-SHA256 with 16 hex digits of display ID. This changes IDs relative to the earlier prototype; never mix old/new outputs as if they used identical mappings. This code change requires a fresh QA run after the last source update.
+
 ## Sequence to create a Store candidate
 1. Complete automated and real-user GUI tests on a clean Windows 10 and Windows 11 PC; record evidence outside any source-data folder.
 2. Supply only **actual Partner Center** package IdentityName, Publisher CN, and PublisherDisplayName, plus real 50/44/150 PNG assets and final product name. Do not use synthetic/test identity for sale.
