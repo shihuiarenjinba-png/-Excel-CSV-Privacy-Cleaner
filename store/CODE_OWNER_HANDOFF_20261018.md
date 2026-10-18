@@ -22,6 +22,7 @@ git status --short
 git rev-parse HEAD
 powershell -NoProfile -ExecutionPolicy Bypass -File .\store\run-windows-qa.ps1
 ```
+別の検証ブランチで検証する場合は、上記の実行時に `-ExpectedBranch 'そのブランチ名'` を指定し、改良ブランチから派生したことを `git merge-base` 等で検証する。
 結果のJSON・ログSHA・実行時コミットSHAを保存し、失敗した項目を再現・修正。成功が確認できないテストをPASSと書かない。
 4. CSVのCP932/UTF-8/UTF-16、引用符・改行、重複列、数式注入の全パターン、XLSXの数式・非表示シート・コメント・外部リンク・破損・大容量、入力/出力不変性、例外処理を再検証する。今回の追加制限: CSV 25MiB、XLSX 15MiB、展開160MiB、最大10万行/シート。
 5. GUIで「壊れたファイルを選んだ後に前のファイルが残らない」「列選択の文字が見える」「未選択列の誤加工なし」「例示プレビューを完全監査と誤認しない」を確認する。
