@@ -375,7 +375,7 @@ def preview_changes(path: Path, columns: set[str], mode: str, salt: str, limit: 
     if path.suffix.lower() == ".csv":
         decoded = decode_text(path.read_bytes())
         reader = csv.DictReader(io.StringIO(decoded, newline=""))
-        validate_headers(list(reader.fieldnames or []), label="CSV")
+        reader.fieldnames = validate_headers(list(reader.fieldnames or []), label="CSV")
         for row in reader:
             if None in row:
                 raise ValueError("CSV data has more fields than headers.")
