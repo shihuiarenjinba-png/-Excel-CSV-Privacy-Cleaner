@@ -337,6 +337,8 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
     ensure_distinct_paths(src, out)
     if mode not in MODES:
         raise ValueError("Mode must be mask, pseudonymize, or drop.")
+    if mode == "pseudonymize" and not salt.strip():
+        raise ValueError("Pseudonymization requires a nonempty private key.")
 
     validate_input_size(src)
     wb = load_workbook(src, keep_links=False)
