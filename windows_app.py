@@ -84,6 +84,24 @@ def validate_headers(raw_headers: list[object], *, label: str) -> list[str]:
     return headers
 
 
+def csv_formula_risk(value: object) -> bool:
+    """Conservatively block spreadsheet-formula-like CSV cells before export.
+
+    CSV can become executable formulas when opened by spreadsheet software.
+    This checks the actual output values; it does not mutate unselected cells.
+    """
+    if value is None:
+        return False
+    content = str(value).lstrip(" \\t\\r\\n")
+    if not content:
+        return False
+    if content[0] in ("=", "+", "@"):
+        return True
+    if content.startswith("-"):
+        return not bool(re.fullmatch(r"-[0-9]+(?:[.][0-9]+)?", content))
+    return False
+
+
 def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> dict:
     ensure_distinct_paths(src, out)
     if mode not in MODES:
@@ -112,22 +130,32 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
     else:
         out_headers = headers
 
+    transformed_rows = []
+    for row_index, row in enumerate(rows, start=2):
+        out_row = dict(row)
+        for col in selected:
+            if mode == "drop":
+                out_row.pop(col, None)
+            elif mode == "pseudonymize":
+                out_row[col] = pseudonym(out_row.get(col, ""), salt)
+            else:
+                out_row[col] = mask_value(out_row.get(col, ""))
+        for column in out_headers:
+            if csv_formula_risk(out_row.get(column)):
+                raise ValueError(
+                    f"Possible spreadsheet formula in output row {row_index}, column '{column}'. "
+                    "Select and pseudonymize/drop that column or remove the risky value. "
+                    "No file was exported."
+                )
+        transformed_rows.append({k: out_row.get(k, "") for k in out_headers})
     created = False
     try:
         with out.open("x", encoding="utf-8-sig", newline="") as fh:
             created = True
             writer = csv.DictWriter(fh, fieldnames=out_headers)
             writer.writeheader()
-            for row in rows:
-                out_row = dict(row)
-                for col in selected:
-                    if mode == "drop":
-                        out_row.pop(col, None)
-                    elif mode == "pseudonymize":
-                        out_row[col] = pseudonym(out_row.get(col, ""), salt)
-                    else:
-                        out_row[col] = mask_value(out_row.get(col, ""))
-                writer.writerow({k: out_row.get(k, "") for k in out_headers})
+            for out_row in transformed_rows:
+                writer.writerow(out_row)
     except BaseException:
         if created:
             out.unlink(missing_ok=True)
