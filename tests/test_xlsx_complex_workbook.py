@@ -5,6 +5,7 @@ from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.workbook.defined_name import DefinedName
 
 from windows_app import clean_xlsx, preview_changes
 
@@ -53,6 +54,32 @@ class XlsxComplexWorkbookTests(unittest.TestCase):
         ws.append(["email", "amount", "calc"])
         ws.append(["a@example.com", 20, "=B2*2"])
         self.assert_rejected_without_damage(wb, "Dropping columns can break formula references", mode="drop")
+
+    def test_mask_rejects_formula_dependencies_on_edited_sheet(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["email", "derived"])
+        ws.append(["a@example.com", '=LEFT(A2,3)'])
+        self.assert_rejected_without_damage(wb, "cannot verify formula dependencies", mode="mask")
+
+    def test_mask_rejects_cross_sheet_formula_dependencies(self):
+        wb = Workbook()
+        data = wb.active
+        data.title = "Data"
+        data.append(["email", "memo"])
+        data.append(["a@example.com", "unchanged"])
+        formulas = wb.create_sheet("Report")
+        formulas.append(["value"])
+        formulas.append(["=Data!A2"])
+        self.assert_rejected_without_damage(wb, "cannot verify formula dependencies", mode="pseudonymize")
+
+    def test_drop_rejects_named_ranges_that_could_become_stale(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["email", "memo"])
+        ws.append(["a@example.com", "keep"])
+        wb.defined_names.add(DefinedName("PrivateRange", attr_text="Sheet!$A$2"))
+        self.assert_rejected_without_damage(wb, "Named ranges can break", mode="drop")
 
     def test_xlsx_edit_rejects_merged_cells(self):
         wb = Workbook()
