@@ -57,7 +57,20 @@ def main() -> None:
                 app.export()
             assert error.called, "Overwriting the previous export must be rejected"
             assert dest.read_bytes() == previous
-            print("GUI_SYNTHETIC_E2E_OK: choose, checkbox, preview, export, no-overwrite")
+            # A rejected replacement must clear the old export target and checked columns.
+            invalid_source = folder / "broken.csv"
+            invalid_source.write_bytes(b"\x00\x01\x02")
+            with patch.object(filedialog, "askopenfilename", return_value=str(invalid_source)), \
+                 patch.object(messagebox, "showerror") as invalid_error:
+                app.choose()
+            assert invalid_error.called
+            assert app.file is None and app.selected_columns() == set()
+            with patch.object(messagebox, "showinfo") as missing_file:
+                app.export()
+            assert missing_file.called
+            assert source.read_bytes() == original
+            assert dest.read_bytes() == previous
+            print("GUI_SYNTHETIC_E2E_OK: choose, checkbox, preview, export, no-overwrite, stale-state reset")
             print("HUMAN_VISUAL_ACCEPTANCE_NOT_TESTED")
         finally:
             root.destroy()
