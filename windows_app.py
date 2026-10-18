@@ -4,6 +4,7 @@ import csv
 import hashlib
 import io
 import re
+from itertools import zip_longest
 import secrets
 from datetime import datetime, timezone
 from zipfile import ZipFile, BadZipFile
@@ -189,7 +190,7 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
                         "Select and pseudonymize/drop that column or remove the risky value. "
                         "No file was exported."
                     )
-            yield {k: out_row.get(k, "") for k in out_headers}
+            yield {k: (out_row.get(k) if out_row.get(k) is not None else "") for k in out_headers}
 
     # Check all rows BEFORE opening a new output. Fail closed on late-row errors.
     count = 0
@@ -204,6 +205,17 @@ def clean_csv(src: Path, out: Path, columns: set[str], mode: str, salt: str) -> 
             writer.writeheader()
             for out_row in transformed():
                 writer.writerow(out_row)
+        # Independently parse the published bytes. A writer or storage failure
+        # must never leave a plausible but silently corrupted "safe" copy.
+        with out.open("r", encoding="utf-8-sig", newline="") as verify_handle:
+            saved = csv.DictReader(verify_handle)
+            if saved.fieldnames != out_headers:
+                raise ValueError("CSV output verification failed: unexpected header.")
+            for index, (saved_row, expected_row) in enumerate(
+                zip_longest(saved, transformed()), start=2
+            ):
+                if saved_row is None or expected_row is None or saved_row != expected_row:
+                    raise ValueError(f"CSV output verification failed at row {index}.")
     except BaseException:
         if created:
             out.unlink(missing_ok=True)
