@@ -6,7 +6,7 @@ from pathlib import Path
 from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from windows_app import clean_xlsx
+from windows_app import clean_xlsx, preview_changes
 
 
 class XlsxComplexWorkbookTests(unittest.TestCase):
@@ -24,6 +24,28 @@ class XlsxComplexWorkbookTests(unittest.TestCase):
             clean_xlsx(self.src, self.dst, {"email"}, mode, "key", True, True)
         self.assertEqual(self.src.read_bytes(), original)
         self.assertFalse(self.dst.exists())
+
+    def test_preview_rejects_formula_drop_before_export_dialog(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["email", "amount", "result"])
+        ws.append(["a@example.com", 10, "=B2*2"])
+        wb.save(self.src)
+        with self.assertRaisesRegex(ValueError, "Dropping columns can break formula"):
+            preview_changes(self.src, {"email"}, "drop", "key")
+        self.assertFalse(self.dst.exists())
+
+    def test_preview_rejects_complex_table_and_preserves_input(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["email", "memo"])
+        ws.append(["a@example.com", "safe"])
+        ws.add_table(Table(displayName="Records", ref="A1:B2"))
+        wb.save(self.src)
+        original = self.src.read_bytes()
+        with self.assertRaisesRegex(ValueError, "simple data worksheets"):
+            preview_changes(self.src, {"email"}, "mask", "key")
+        self.assertEqual(self.src.read_bytes(), original)
 
     def test_xlsx_drop_rejects_formula_references(self):
         wb = Workbook()
