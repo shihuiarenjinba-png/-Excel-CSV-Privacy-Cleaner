@@ -2,6 +2,12 @@
 
 **CURRENT STATUS: HOLD.** None of the following checks is satisfied merely by committing code or drafting listings.
 
+## Before creating a Partner Center product frame
+- [ ] Run actual Windows code, GUI, hostile-file, egress and dependency-license checks; record immutable SHA256 evidence
+- [ ] Use `store/release_gate.py --stage registration --evidence <file>` with the exact checked commit SHA and inspect its output
+- [ ] Confirm paid customer use case, free competitors, price hypothesis and Microsoft Store name rights; then manually authorize product-name reservation
+- [ ] Do not reserve the name only because source code or test definitions exist. Current registration **HOLD**.
+
 ## Product and customer acceptance
 - [x] Short path: choose a file → select columns via checkboxes → choose transform → preview → export another file
 - [x] Existing source and export files protected by exclusive-create logic
