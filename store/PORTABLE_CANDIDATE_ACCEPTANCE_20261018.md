@@ -8,6 +8,9 @@
 - **追加検証 PASS（ユーザーのWindows実行報告）:** `store/review-portable-candidate.ps1` が `PORTABLE EXE INTEGRITY: PASS` と表示し、ビルド時の `candidate-manifest.json` と現物EXEのSHA256が一致した。確認した容量は `11,982,739` バイト。Authenticodeは `NotSigned` で、当初から署名していない検証用ポータブルEXEの状態と整合する。これを**マルウェア・安全性・Windows GUI・Store適合の合格と誤認しない**。
 - 現在の判定: **登録HOLD、販売HOLD。** 既存の候補EXEを改変・削除・再署名しない。
 
+## GUI起動でブロック（2026-10-18）
+`Start-Process -FilePath $exe` を実行するとWindowsから「アプリケーション制御ポリシーによってこのファイルがブロックされました」と表示され、EXEは起動しなかった。原因は未確定で、署名なしという事実だけでは診断しない。**実機GUI判定はFAIL/BLOCKED、製品登録と販売はHOLD**。CodeIntegrity／AppLocker等のイベント調査手順は [WINDOWS_LAUNCH_POLICY_BLOCK_20261018.md](WINDOWS_LAUNCH_POLICY_BLOCK_20261018.md)、追跡は [Issue #4](https://github.com/shihuiarenjinba-png/-Excel-CSV-Privacy-Cleaner/issues/4)。
+
 ## まずEXEの完全性を読むだけで検証
 PowerShellで、GitHubの改良ブランチを別の検証フォルダーへpullした後:
 
