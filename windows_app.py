@@ -333,6 +333,20 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
         with out.open("xb") as handle:
             created = True
             wb.save(handle)
+        # Saving can produce an unreadable or incomplete workbook. Refuse to
+        # publish unless openpyxl can reopen it with the intended sheet layout.
+        reopened = load_workbook(out, read_only=True, keep_links=False)
+        try:
+            if reopened.sheetnames != wb.sheetnames:
+                raise ValueError("XLSX output verification failed: sheet list changed.")
+            for intended in wb.worksheets:
+                actual = reopened[intended.title]
+                if (actual.max_row, actual.max_column) != (intended.max_row, intended.max_column):
+                    raise ValueError(
+                        f"XLSX output verification failed: sheet dimensions changed for {intended.title!r}."
+                    )
+        finally:
+            reopened.close()
     except BaseException:
         if created:
             out.unlink(missing_ok=True)
