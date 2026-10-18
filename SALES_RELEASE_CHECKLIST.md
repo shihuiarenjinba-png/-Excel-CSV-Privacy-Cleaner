@@ -17,7 +17,7 @@
 - [ ] Japanese/English UI at 100%, 125%, 150% scaling; keyboard and accessible navigation, Windows 10 and 11
 
 ## Safety and regression
-- [x] Windows local automated QA passed at source SHA `5a11d5e50eed856a8948966a9e0886248b58c615` as reported by the actual Windows user; the unsigned portable candidate was generated. GitHub-hosted runner still blocked; original local QA artifacts and executable hash have not been independently read by this reviewer.
+- [x] Windows local automated QA passed at source SHA `5a11d5e50eed856a8948966a9e0886248b58c615` as reported by the actual Windows user; the unsigned portable candidate was generated. The user subsequently executed the read-only EXE integrity script and reported **PASS**: manifest and binary SHA256 both `9a81e3a7deb5d8048cde49b164bf0596344469644a1e12c57a06281fc6010962`, 11,982,739 bytes, Authenticode `NotSigned`. The reviewer has not downloaded/inspected that Windows EXE directly. GitHub-hosted runner is still blocked; GUI, AV, egress and legal checks remain HOLD.
 - [ ] CSV encoding, quoted multiline, long Unicode, bad headers and formula injection tests
 - [ ] XLSX hidden sheets, comments, formulas, hyperlinks, large-file and complex workbook limitations
 - [ ] Source/output immutability under errors and restarts
