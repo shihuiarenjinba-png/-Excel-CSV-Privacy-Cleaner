@@ -257,6 +257,39 @@ def scrub_core_properties(wb) -> None:
             setattr(props, attr, None)
 
 
+
+def validate_xlsx_edit_scope(wb, columns: set[str], mode: str, remove_hidden: bool) -> None:
+    """Refuse workbook features that openpyxl cannot reliably remap on column edits.
+
+    Most spreadsheet structures are *not* equivalent to a plain data table.
+    In particular, delete_cols does not rewrite formula references.
+    """
+    for ws in wb.worksheets:
+        if remove_hidden and ws.sheet_state != "visible":
+            continue
+        has_drawings = bool(ws._charts or ws._images or ws._pivots)
+        has_structures = bool(ws.tables or ws.merged_cells.ranges)
+        if has_drawings or has_structures:
+            raise ValueError(
+                f"Worksheet {ws.title!r} contains tables, merged cells, "
+                "images, charts or pivot tables. This version only supports "
+                "simple data worksheets. No file was exported."
+            )
+    if mode == "drop":
+        for ws in wb.worksheets:
+            if remove_hidden and ws.sheet_state != "visible":
+                continue
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.data_type == "f":
+                        raise ValueError(
+                            f"Worksheet {ws.title!r} contains formulas. "
+                            "Dropping columns can break formula references. "
+                            "Remove formulas in a separate copy or use a CSV input. "
+                            "No file was exported."
+                        )
+
+
 def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, remove_hidden: bool, remove_comments: bool) -> dict:
     from openpyxl import load_workbook
 
@@ -266,6 +299,7 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
 
     validate_input_size(src)
     wb = load_workbook(src, keep_links=False)
+    validate_xlsx_edit_scope(wb, columns, mode, remove_hidden)
     scrub_core_properties(wb)
     removed_sheets = 0
     removed_external_formulas = 0
