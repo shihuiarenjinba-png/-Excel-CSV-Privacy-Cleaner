@@ -13,6 +13,10 @@ CSV supports up to 25 MiB and 100,000 rows. XLSX accepts up to 15 MiB compressed
 
 Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\store\run-windows-qa.ps1` from a clean checked-out `improve/simple-column-ui-20261018` branch. It creates unique QA logs and a result JSON under `Documents\ExcelCSVPrivacyCleaner-QA`; it never marks GUI/MSIX/Store certification as passed. If `python` or pinned dependencies cannot run, the evidence records HOLD. The generated report is not customer-facing and should not include personal data.
 
+## Product-frame readiness gate (before reserving a name)
+
+See [PHASE1_REGISTRATION_READINESS.md](PHASE1_REGISTRATION_READINESS.md). Once test/GUI/privacy/license evidence exists for the exact commit, run `py -3 .\store\release_gate.py --stage registration --evidence .\store\actual-evidence.json`. This checks five pre-registration quality gates **without requiring a Partner Center identity or MSIX**. Passing the evidence check is not automatic permission to publish or reserve a name; verify name rights, timing and customer value manually. Current registration decision: **HOLD**.
+
 ## Sequence to create a Store candidate
 1. Complete automated and real-user GUI tests on a clean Windows 10 and Windows 11 PC; record evidence outside any source-data folder.
 2. Supply only **actual Partner Center** package IdentityName, Publisher CN, and PublisherDisplayName, plus real 50/44/150 PNG assets and final product name. Do not use synthetic/test identity for sale.
