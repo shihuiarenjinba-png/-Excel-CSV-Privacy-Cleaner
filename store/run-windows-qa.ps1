@@ -43,6 +43,7 @@ try {
     try {
         Record "Existing smoke" $python @("smoke_test.py")
         Record "Regression suite" $python @("-m","unittest","discover","-s","tests","-p","test_*.py","-v")
+        Record "Synthetic Tk GUI flow" $python @("gui_smoke_test.py")
         Record "Bilingual smoke" $python @("bilingual_smoke_test.py")
         Record "Language standard" $python @("language_standard_smoke_test.py")
         Record "Dialog parents" $python @("dialog_parent_smoke_test.py")
