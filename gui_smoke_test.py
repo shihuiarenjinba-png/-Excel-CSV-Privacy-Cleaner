@@ -5,7 +5,7 @@ Programmatic widget commands are not a replacement for a human visual/DPI check.
 from pathlib import Path
 import csv
 import tempfile
-from tkinter import Tk
+from tkinter import Tk, Radiobutton
 from unittest.mock import patch
 
 from windows_app import App, filedialog, messagebox
@@ -28,6 +28,23 @@ def main() -> None:
             root.withdraw()
             app = App(root)
             root.update_idletasks()
+            def get_radio_buttons(widget):
+                found = []
+                for child in widget.winfo_children():
+                    if isinstance(child, Radiobutton):
+                        found.append(child)
+                    found.extend(get_radio_buttons(child))
+                return found
+
+            choices = {item.cget("value"): item for item in get_radio_buttons(root)}
+            assert set(choices) == {"mask", "pseudonymize", "drop"}
+            assert app.mode.get() == "mask"
+            choices["drop"].invoke()
+            assert app.mode.get() == "drop"
+            choices["pseudonymize"].invoke()
+            assert app.mode.get() == "pseudonymize"
+            choices["mask"].invoke()
+            assert app.mode.get() == "mask"
             with patch.object(filedialog, "askopenfilename", return_value=str(source)):
                 app.choose()
             assert set(app.column_vars) == {"名前", "email", "部署"}
