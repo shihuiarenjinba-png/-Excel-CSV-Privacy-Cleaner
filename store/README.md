@@ -5,6 +5,14 @@ This directory contains **drafts and locally executable validation tools**, not 
 ## Business decision
 Primary first-sale candidate: Excel / CSV Privacy Cleaner. Proposed Japanese buy-once test price **¥980** initial experiment (compare with **¥1,480**; Partner Center market price *not set*). Audience: small-office operators preparing selected CSV/XLSX columns for sharing. Paid value is a simple, explicit, local workflow, not guaranteed anonymization. See `monetization_plan.md` and `listing_ja.md` / `listing_en.md`.
 
+## Current safety and size restrictions
+
+CSV supports up to 25 MiB and 100,000 rows. XLSX accepts up to 15 MiB compressed, 160 MiB expanded and 100,000 rows per sheet. These caps must be shown to prospective customers; they are not a claim that the product processes unlimited datasets. Formula-shaped CSV cells or headers can block export. This is deliberately conservative: never silently change unselected cells.
+
+## Local Windows proof when hosted runners fail
+
+Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\store\run-windows-qa.ps1` from a clean checked-out `improve/simple-column-ui-20261018` branch. It creates unique QA logs and a result JSON under `Documents\ExcelCSVPrivacyCleaner-QA`; it never marks GUI/MSIX/Store certification as passed. If `python` or pinned dependencies cannot run, the evidence records HOLD. The generated report is not customer-facing and should not include personal data.
+
 ## Sequence to create a Store candidate
 1. Complete automated and real-user GUI tests on a clean Windows 10 and Windows 11 PC; record evidence outside any source-data folder.
 2. Supply only **actual Partner Center** package IdentityName, Publisher CN, and PublisherDisplayName, plus real 50/44/150 PNG assets and final product name. Do not use synthetic/test identity for sale.
