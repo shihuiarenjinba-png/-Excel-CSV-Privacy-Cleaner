@@ -75,7 +75,6 @@ try {
   <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
   <Applications>
     <Application Id="App" Executable="ExcelCSVPrivacyCleaner.exe"
-                 EntryPoint="Windows.FullTrustApplication"
                  uap10:RuntimeBehavior="packagedClassicApp"
                  uap10:TrustLevel="mediumIL">
       <uap:VisualElements DisplayName="$SafeDisplay"
