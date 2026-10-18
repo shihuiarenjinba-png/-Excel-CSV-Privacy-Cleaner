@@ -435,6 +435,19 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
                     raise ValueError(
                         f"XLSX output verification failed: sheet dimensions changed for {intended.title!r}."
                     )
+                # Check ALL saved cell values/formulas, not only the sheet size.
+                # A file can reopen with the expected dimensions while retaining
+                # sensitive values or losing edits in individual cells.
+                for row_number, pair in enumerate(zip_longest(
+                    intended.iter_rows(values_only=True),
+                    actual.iter_rows(values_only=True),
+                ), start=1):
+                    expected_row, saved_row = pair
+                    if expected_row != saved_row:
+                        raise ValueError(
+                            f"XLSX output verification failed at {intended.title!r}, "
+                            f"row {row_number}; no exported workbook retained."
+                        )
         finally:
             reopened.close()
     except BaseException:
