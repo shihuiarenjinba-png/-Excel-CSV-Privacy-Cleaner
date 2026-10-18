@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "commit_sha": "SET_EXACT_RELEASE_COMMIT_SHA_AT_FREEZE",
+  "gates": {
+    "functional_tests": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "human_gui": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "hostile_fixtures": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "privacy_egress": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "dependencies_license": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "store_identity": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "msix_package": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "installation_lifecycle": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "windows_certification": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "store_listing": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    },
+    "commerce": {
+      "status": "TODO",
+      "evidence_file": "",
+      "sha256": ""
+    }
+  }
+}
