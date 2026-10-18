@@ -11,6 +11,8 @@ How it works: choose a CSV or XLSX file → select target columns → choose Mas
 
 Includes Unicode/Japanese CSV and Excel data support, a simplified desktop GUI with advanced controls hidden by default, conservative output overwrite protection, optional handling of workbook comments/hidden sheets and some external references, and refusal to export CSV with remaining spreadsheet-formula-shaped values.
 
+**Workbook restrictions:** This edition focuses on ordinary tabular sheets. It refuses workbooks with merged cells, Excel tables, images, charts or pivot tables. Column deletion is refused if formulas or named ranges may be affected; masking/pseudonymization are also refused where formula dependencies cannot be verified. These are intentional data-integrity safeguards, not claims of full spreadsheet cleaning.
+
 **Limits for this candidate:** CSV up to 25 MiB, compressed XLSX up to 15 MiB with a 160 MiB uncompressed content budget, and up to 100,000 data rows per sheet. Oversized inputs are refused before export.
 
 **Limitations**: This product does not discover or eliminate every personal or confidential field. Other columns, images, macros, formulas, embedded items and advanced spreadsheet structures may retain data or be modified by conversion. XLSM is not supported. Pseudonyms are not encryption or guaranteed anonymization. Review the exported copy before sharing. No regulatory certification or guarantee of complete removal is claimed.
