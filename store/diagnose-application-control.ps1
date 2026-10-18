@@ -52,7 +52,8 @@ foreach ($entry in $eventSources) {
             $hits++
             Write-Host "Event ID $($event.Id) at $($event.TimeCreated)"
             Write-Host "Log: $($entry.Log)"
-            Write-Host (($event.Message -replace "\r", '') -split "\n" | Select-Object -First 16 | Out-String).Trim()
+            $displayLines = ($event.Message -replace '\r', '') -split '\n'
+            Write-Host (($displayLines | Select-Object -First 16) -join [Environment]::NewLine)
             Write-Host '---'
         }
     } catch {
