@@ -17,7 +17,7 @@
 - [ ] Japanese/English UI at 100%, 125%, 150% scaling; keyboard and accessible navigation, Windows 10 and 11
 
 ## Safety and regression
-- [ ] GitHub Actions or Windows local tests executed and passed (current hosted runners never start job steps)
+- [x] Windows local automated QA passed at source SHA `5a11d5e50eed856a8948966a9e0886248b58c615` as reported by the actual Windows user; the unsigned portable candidate was generated. GitHub-hosted runner still blocked; original local QA artifacts and executable hash have not been independently read by this reviewer.
 - [ ] CSV encoding, quoted multiline, long Unicode, bad headers and formula injection tests
 - [ ] XLSX hidden sheets, comments, formulas, hyperlinks, large-file and complex workbook limitations
 - [ ] Source/output immutability under errors and restarts
