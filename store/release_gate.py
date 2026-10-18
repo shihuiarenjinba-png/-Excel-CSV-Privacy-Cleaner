@@ -65,8 +65,22 @@ def check_evidence(root: Path, payload: dict, actual_commit: str, *, required_ga
             faults.append(key)
             continue
         try:
-            location = (base / relative).resolve(strict=True)
-            if not location.is_relative_to(base) or not location.is_file() or location.is_symlink():
+            rel = Path(relative)
+            if rel.is_absolute() or ".." in rel.parts or not rel.parts:
+                faults.append(key)
+                continue
+            unresolved = base
+            redirected = False
+            for part in rel.parts:
+                unresolved = unresolved / part
+                if unresolved.is_symlink():
+                    redirected = True
+                    break
+            if redirected:
+                faults.append(key)
+                continue
+            location = unresolved.resolve(strict=True)
+            if not location.is_relative_to(base) or not location.is_file():
                 faults.append(key)
                 continue
             if file_digest(location) != declared_sha:
@@ -79,6 +93,9 @@ def check_evidence(root: Path, payload: dict, actual_commit: str, *, required_ga
 def main() -> int:
     parser = argparse.ArgumentParser(description="Local candidate release evidence check; always fail closed.")
     parser.add_argument("--evidence", required=True, type=Path)
+    parser.add_argument("--evidence-root", type=Path,
+                        help="Base directory of evidence_file paths (default: repository root). "
+                             "Use a local non-Git folder for private QA logs.")
     parser.add_argument("--stage", choices=("registration", "sale"), default="sale",
                         help="registration checks quality before creating a Store product frame")
     args = parser.parse_args()
@@ -91,7 +108,8 @@ def main() -> int:
         evidence = json.loads(args.evidence.read_text(encoding="utf-8"))
         if not isinstance(evidence, dict):
             raise ValueError("Evidence must be a JSON object.")
-        faults = check_evidence(root, evidence, commit,
+        proof_base = args.evidence_root if args.evidence_root is not None else root
+        faults = check_evidence(proof_base, evidence, commit,
                                 required_gates=(REGISTRATION_GATES if args.stage == "registration" else None))
     except (OSError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         print("HOLD: evidence could not be verified: " + str(error))
