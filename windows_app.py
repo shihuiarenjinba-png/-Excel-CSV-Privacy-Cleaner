@@ -445,7 +445,8 @@ def available_columns(path: Path) -> list[str]:
     raise ValueError("Only CSV and XLSX inputs are supported.")
 
 
-def preview_changes(path: Path, columns: set[str], mode: str, salt: str, limit: int = 4) -> list[str]:
+def preview_changes(path: Path, columns: set[str], mode: str, salt: str, limit: int = 4,
+                    *, remove_hidden: bool = True) -> list[str]:
     """Short in-memory illustrative before/after preview; not a security audit."""
     if not columns:
         return ["Select at least one column to preview."]
@@ -463,6 +464,13 @@ def preview_changes(path: Path, columns: set[str], mode: str, salt: str, limit: 
                 break
     else:
         from openpyxl import load_workbook
+        # Preview must reject unsupported structures BEFORE presenting apparently
+        # valid samples that could never be exported safely.
+        preflight = load_workbook(path, keep_links=False, data_only=False)
+        try:
+            validate_xlsx_edit_scope(preflight, columns, mode, remove_hidden)
+        finally:
+            preflight.close()
         wb = load_workbook(path, read_only=True, keep_links=False, data_only=False)
         try:
             for ws in wb.worksheets:
@@ -615,7 +623,8 @@ class App:
         if not selected:
             return messagebox.showwarning("No columns selected", "Check one or more column names.")
         try:
-            lines = preview_changes(self.file, selected, self.mode.get(), self.salt.get())
+            lines = preview_changes(self.file, selected, self.mode.get(), self.salt.get(),
+                                    remove_hidden=bool(self.remove_hidden.get()))
             self.listbox.delete(0, END)
             for line in lines:
                 self.listbox.insert(END, line)
