@@ -7,6 +7,8 @@ Primary first-sale candidate: Excel / CSV Privacy Cleaner. Proposed Japanese buy
 
 ## Current safety and size restrictions
 
+Complex XLSX sheets with tables, merged cells, embedded charts/images, or pivot tables are now refused at preview/export; column drops with formulas/named ranges and transformations with uncertain formula dependencies are also rejected. The application does **not** attempt to rewrite formulas or structural references. Empty CSV values stay blank when pseudonymized. The current candidate needs a NEW Windows regression run after these source changes.
+
 CSV supports up to 25 MiB and 100,000 rows. XLSX accepts up to 15 MiB compressed, 160 MiB expanded and 100,000 rows per sheet. These caps must be shown to prospective customers; they are not a claim that the product processes unlimited datasets. Formula-shaped CSV cells or headers can block export. This is deliberately conservative: never silently change unselected cells.
 
 ## First time on Windows: source files are NOT auto-downloaded
