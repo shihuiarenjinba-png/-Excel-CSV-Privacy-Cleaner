@@ -32,8 +32,17 @@ try {
     }
     function Record([string]$label, [string]$executable, [string[]]$arguments) {
         ("==== " + $label + " ====") | Out-File -LiteralPath $log -Append -Encoding utf8
-        $output = & $executable @arguments 2>&1 | Out-String
-        $exit = $LASTEXITCODE
+        # Windows PowerShell 5.1 may promote a native tool's harmless stderr
+        # into a terminating NativeCommandError when ErrorActionPreference=Stop.
+        # Preserve stderr in the log and trust the real process exit code.
+        $oldPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            $output = & $executable @arguments 2>&1 | Out-String
+            $exit = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
         $output | Out-File -LiteralPath $log -Append -Encoding utf8
         $script:results += [ordered]@{name=$label;exit_code=$exit}
         if ($exit -ne 0) { throw "$label failed ($exit). See $log" }
