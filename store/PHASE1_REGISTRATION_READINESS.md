@@ -52,6 +52,12 @@ py -3 .\store\release_gate.py --stage registration --evidence .\store\actual-evi
 
 商品枠が作成された後は正式 `Package Identity Name` と `Publisher` を利用してMSIXを作成し、実機でインストール・起動・更新・アンインストールを確認し、正式にStore認定を受ける。MSIXや認定は第1工程完了の前提ではない。
 
+## 今回追加の商用品質対策（再テスト必須）
+- 数式参照を壊す列削除、数式依存の検証ができないマスク・仮名化、結合セル・Excelテーブル・画像・グラフ・ピボットを含む複雑なブックはプレビュー時から拒否する。
+- CSVの空欄の仮名ID生成を停止し、空欄のまま保存する。
+- `tests/test_xlsx_complex_workbook.py` と `tests/test_csv_integrity_streaming.py` の追加テストを実行すること。以前のWindows自動テストPASSは改良前のコミットであり、最新の品質証拠には使わない。
+- 登録前に利用者が複雑Excelの制限を理解できるよう、商品説明を更新した。
+
 ## 重大な未検証リスク
 - Excelの数式、参照、画像、チャート、外部リンク、非表示内容を含む複雑なブックでのデータ完全性は未証明。
 - CSVの変換・3段階の検証は最大25MiBのデータで時間がかかる場合があり、GUIの応答性・進捗表示を実機で確認すること。
