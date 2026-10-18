@@ -336,6 +336,11 @@ def clean_xlsx(src: Path, out: Path, columns: set[str], mode: str, salt: str, re
 
     if not wb.worksheets:
         raise ValueError("All worksheets would be removed. Keep at least one visible sheet.")
+    if not any(item["processed_columns"] for item in sheet_results):
+        raise ValueError(
+            "No selected columns matched the retained worksheets. "
+            "No misleading unchanged copy was created."
+        )
     created = False
     try:
         with out.open("xb") as handle:
