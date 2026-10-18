@@ -438,7 +438,8 @@ class App:
         self.canvas.pack(side=LEFT, fill="both", expand=True)
         scroll.pack(side="right", fill="y")
         self.check_area = Frame(self.canvas)
-        self.canvas.create_window((0, 0), window=self.check_area, anchor="nw")
+        self.check_window = self.canvas.create_window((0, 0), window=self.check_area, anchor="nw")
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(self.check_window, width=e.width))
         self.check_area.bind("<Configure>", lambda _e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
 
         options = Frame(root, padx=12, pady=9)
@@ -488,6 +489,13 @@ class App:
             if len(names) > 250:
                 raise ValueError("Over 250 distinct columns: use a smaller input or split it before processing.")
         except Exception as exc:
+            # Never leave a previously chosen source active after a failed replacement.
+            self.file = None
+            self.column_vars = {}
+            for widget in self.check_area.winfo_children():
+                widget.destroy()
+            self.listbox.delete(0, END)
+            self.listbox.insert(END, "Input validation failed; select a supported file before exporting.")
             messagebox.showerror("Cannot read columns", str(exc))
             return
         self.file = candidate
