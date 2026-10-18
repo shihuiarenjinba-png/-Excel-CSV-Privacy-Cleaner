@@ -38,7 +38,9 @@ try {
         $script:results += [ordered]@{name=$label;exit_code=$exit}
         if ($exit -ne 0) { throw "$label failed ($exit). See $log" }
     }
-    Record "Isolated environment" "py" @("-3","-m","venv",$venv)
+    . (Join-Path $Root "build_python.ps1")
+    $BasePython = Resolve-BuildPython
+    Record "Isolated environment" $BasePython @("-m","venv",$venv)
     $python = Join-Path $venv "Scripts\python.exe"
     Record "Pinned packages" $python @("-m","pip","install","-r",(Join-Path $Root "requirements-windows.lock.txt"))
     Record "Python compile" $python @("-m","compileall","-q",(Join-Path $Root "windows_app.py"),(Join-Path $Root "i18n.py"),(Join-Path $Root "tests"))
