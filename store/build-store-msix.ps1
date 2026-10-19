@@ -93,12 +93,12 @@ try {
     }
     [System.IO.File]::WriteAllText((Join-Path $Stage "AppxManifest.xml"), $Manifest,
                                   (New-Object System.Text.UTF8Encoding($false)))
-    & MakeAppx.exe pack /d $Stage /p $Package /nv
+    & MakeAppx.exe pack /d $Stage /p $Package
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Package -PathType Leaf)) {
         throw "MakeAppx pack failed"
     }
     New-Item -ItemType Directory -Path $Check | Out-Null
-    & MakeAppx.exe unpack /p $Package /d $Check /nv
+    & MakeAppx.exe unpack /p $Package /d $Check
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $Check "ExcelCSVPrivacyCleaner.exe"))) {
         throw "MSIX roundtrip unpack or executable verification failed"
     }
