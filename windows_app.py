@@ -12,6 +12,7 @@ from zipfile import ZipFile, BadZipFile
 from pathlib import Path
 from tkinter import BOTH, END, LEFT, Button, Canvas, Checkbutton, Entry, Frame, IntVar, Label, Listbox, Radiobutton, Scrollbar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
+from ui_export_approval import export_revision
 
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?81[- ]?)?0?\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}(?!\d)")
@@ -594,6 +595,7 @@ class App:
         self.advanced_visible = False
         self.show_key = IntVar(value=0)
         self.key_entry = None
+        self.preview_revision: str | None = None
 
         head = Frame(root, padx=12, pady=12)
         head.pack(fill="x")
@@ -602,8 +604,8 @@ class App:
         toolbar = Frame(root, padx=12)
         toolbar.pack(fill="x")
         Button(toolbar, text="1  Choose file", command=self.choose, width=17).pack(side=LEFT)
-        Button(toolbar, text="4  Preview", command=self.preview, width=14).pack(side=LEFT, padx=8)
-        Button(toolbar, text="5  Export copy", command=self.export, width=17).pack(side=LEFT)
+        Button(toolbar, text="4  Preview (no write)", command=self.preview, width=20).pack(side=LEFT, padx=8)
+        Button(toolbar, text="5  Confirm & export", command=self.export, width=19).pack(side=LEFT)
 
         Label(root, text="2  Check the columns to process (none selected by default)", anchor="w").pack(fill="x", padx=12, pady=(12, 2))
         column_box = Frame(root, padx=12)
@@ -681,6 +683,7 @@ class App:
             messagebox.showerror("Cannot read columns", str(exc))
             return
         self.file = candidate
+        self.preview_revision = None
         for widget in self.check_area.winfo_children():
             widget.destroy()
         self.column_vars = {}
@@ -699,12 +702,20 @@ class App:
         if not selected:
             return messagebox.showwarning("No columns selected", "Check one or more column names.")
         try:
+            before = export_revision(self.file, selected, self.mode.get(), self.salt.get(),
+                                     bool(self.remove_hidden.get()), bool(self.remove_comments.get()))
             lines = preview_changes(self.file, selected, self.mode.get(), self.salt.get(),
                                     remove_hidden=bool(self.remove_hidden.get()))
+            after = export_revision(self.file, selected, self.mode.get(), self.salt.get(),
+                                    bool(self.remove_hidden.get()), bool(self.remove_comments.get()))
+            if before != after:
+                raise ValueError("入力がプレビュー中に更新されました。再度確認してください。")
+            self.preview_revision = after
             self.listbox.delete(0, END)
             for line in lines:
                 self.listbox.insert(END, line)
         except Exception as exc:
+            self.preview_revision = None
             messagebox.showerror("Preview failed", str(exc))
 
     def export(self):
@@ -718,6 +729,15 @@ class App:
             return messagebox.showerror("Invalid method", "Choose mask, pseudonymize or drop.")
         if mode == "pseudonymize" and not self.salt.get().strip():
             return messagebox.showerror("Missing key", "Pseudonymization needs a nonempty private key.")
+        try:
+            current_revision = export_revision(self.file, selected, mode, self.salt.get(),
+                                               bool(self.remove_hidden.get()), bool(self.remove_comments.get()))
+        except (ValueError, OSError) as exc:
+            self.preview_revision = None
+            return messagebox.showerror("Input changed", str(exc))
+        if self.preview_revision != current_revision:
+            return messagebox.showwarning("Preview required",
+                "The input, selected columns or options have changed. Click Preview before exporting.")
         if not messagebox.askokcancel(
             "Review export",
             f"{len(selected)} selected column(s): {', '.join(sorted(selected)[:8])}"
@@ -736,6 +756,7 @@ class App:
         destination = Path(out)
         if destination.exists() or destination.is_symlink():
             return messagebox.showerror("File exists", "Choose a new output filename; existing files are never replaced.")
+        self.preview_revision = None  # Approval is single-use; no automatic replay.
         try:
             if ext == ".csv":
                 stats = clean_csv(self.file, destination, selected, mode, self.salt.get())
@@ -744,6 +765,12 @@ class App:
                                    bool(self.remove_hidden.get()), bool(self.remove_comments.get()))
             if destination.stat().st_size <= 0:
                 raise ValueError("Generated file is empty; do not share.")
+            if export_revision(self.file, selected, mode, self.salt.get(),
+                               bool(self.remove_hidden.get()), bool(self.remove_comments.get())) != current_revision:
+                # clean_csv/clean_xlsx own this brand-new output. A changed input
+                # invalidates it; the customer's original source is never deleted.
+                destination.unlink(missing_ok=True)
+                raise ValueError("The source changed during export; discarded the new copy. Preview again.")
             self.listbox.delete(0, END)
             for line in format_export_summary(destination, stats, selected):
                 self.listbox.insert(END, line)
