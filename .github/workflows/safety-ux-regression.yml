@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - improve/simple-column-ui-20261018
+      - 'ui/safe-product-upgrade-20261019'
   workflow_dispatch:
 
 permissions:
