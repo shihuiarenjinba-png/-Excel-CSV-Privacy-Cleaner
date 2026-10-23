@@ -585,7 +585,8 @@ class App:
     def __init__(self, root: Tk):
         self.root = root
         self.root.title("Excel / CSV Privacy Cleaner — Windows")
-        self.root.geometry("940x720")
+        self.root.geometry("940x680")
+        self.root.minsize(820, 600)
         self.file: Path | None = None
         self.mode = StringVar(value="mask")
         self.salt = StringVar(value=secrets.token_hex(16))
@@ -692,7 +693,7 @@ class App:
             self.column_vars[name] = state
             Checkbutton(self.check_area, text=name, variable=state, anchor="w").pack(anchor="w")
         self.listbox.delete(0, END)
-        self.listbox.insert(END, f"Selected: {self.file}")
+        self.listbox.insert(END, f"Selected: {self.file.name}")
         self.listbox.insert(END, f"Loaded {len(names)} column labels. Check only those you intend to change.")
 
     def preview(self):
