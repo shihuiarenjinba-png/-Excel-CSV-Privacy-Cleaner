@@ -8,11 +8,29 @@ param(
     [Parameter(Mandatory=$true)][string]$DisplayName,
     [Parameter(Mandatory=$true)][string]$AssetsDirectory,
     [Parameter(Mandatory=$true)][string]$ExePath,
-    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+\.0$')][string]$Version = "1.0.0.0"
+    [Parameter(Mandatory=$true)][ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+\.0$')][string]$Version
 )
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$ExpectedBranch = "codex/store-p1-excel-csv-privacy-20261023"
+function Invoke-GitText {
+    param([string[]]$GitArguments)
+    $Output = & git @GitArguments 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Git command failed (exit $LASTEXITCODE): git $($GitArguments -join ' '); output: $Output" }
+    return ($Output | Out-String).Trim()
+}
+Set-Location -LiteralPath $Root
+$RemoteUrl = Invoke-GitText -GitArguments @("remote","get-url","origin")
+if ($RemoteUrl -notmatch '(?i)github[.]com[:/]shihuiarenjinba-png/-Excel-CSV-Privacy-Cleaner(?:[.]git)?$') { throw "Wrong origin repository." }
+Invoke-GitText -GitArguments @("fetch","origin") | Out-Null
+$Branch = Invoke-GitText -GitArguments @("branch","--show-current")
+$SourceSha = Invoke-GitText -GitArguments @("rev-parse","HEAD")
+$RemoteSha = Invoke-GitText -GitArguments @("rev-parse",("origin/" + $ExpectedBranch))
+$DirtyState = Invoke-GitText -GitArguments @("status","--porcelain","--untracked-files=all")
+if ($Branch -cne $ExpectedBranch) { throw "Wrong working branch: $Branch" }
+if ($SourceSha -notmatch '^[0-9a-f]{40}$' -or $RemoteSha -cne $SourceSha) { throw "Local and remote HEAD must be identical." }
+if ($DirtyState) { throw "Uncommitted or untracked changes exist; stopped before packaging." }
 
 if ($IdentityName -notmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{1,48}$' -or
     $IdentityName -match '(?i)(example|placeholder|testidentity|yourname)') {
@@ -44,6 +62,7 @@ $Check = Join-Path $env:TEMP ("ExcelCSVPrivacyCleaner-check-" + [guid]::NewGuid(
 try {
     New-Item -ItemType Directory -Path (Join-Path $Stage "Assets") -Force | Out-Null
     Copy-Item -LiteralPath $ExePath -Destination (Join-Path $Stage "ExcelCSVPrivacyCleaner.exe") -ErrorAction Stop
+    Set-Content -LiteralPath (Join-Path $Stage "SOURCE_GIT_COMMIT.txt") -Value $SourceSha -Encoding ASCII
     foreach ($name in @("StoreLogo.png", "Square44x44Logo.png", "Square150x150Logo.png")) {
         $Source = Join-Path $AssetsDirectory $name
         if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw "Missing real logo asset: $Source" }
@@ -102,12 +121,32 @@ try {
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $Check "ExcelCSVPrivacyCleaner.exe"))) {
         throw "MSIX roundtrip unpack or executable verification failed"
     }
+    [xml]$RoundtripManifest = Get-Content -LiteralPath (Join-Path $Check "AppxManifest.xml") -Raw -Encoding UTF8
+    $Ns = New-Object System.Xml.XmlNamespaceManager($RoundtripManifest.NameTable)
+    $Ns.AddNamespace("f","http://schemas.microsoft.com/appx/manifest/foundation/windows10")
+    $Ns.AddNamespace("uap","http://schemas.microsoft.com/appx/manifest/uap/windows10")
+    $IdNode = $RoundtripManifest.SelectSingleNode("/f:Package/f:Identity",$Ns)
+    $PropsNode = $RoundtripManifest.SelectSingleNode("/f:Package/f:Properties",$Ns)
+    $VisualNode = $RoundtripManifest.SelectSingleNode("/f:Package/f:Applications/f:Application/uap:VisualElements",$Ns)
+    $DisplayNode = if ($null -ne $PropsNode) { $PropsNode.SelectSingleNode("f:DisplayName",$Ns) } else { $null }
+    $PublisherNode = if ($null -ne $PropsNode) { $PropsNode.SelectSingleNode("f:PublisherDisplayName",$Ns) } else { $null }
+    if ($null -eq $IdNode -or $null -eq $DisplayNode -or $null -eq $PublisherNode -or $null -eq $VisualNode -or
+        $IdNode.GetAttribute("Name") -cne $IdentityName -or $IdNode.GetAttribute("Publisher") -cne $Publisher -or
+        $IdNode.GetAttribute("Version") -cne $Version -or $IdNode.GetAttribute("ProcessorArchitecture") -cne "x64" -or
+        $DisplayNode.InnerText -cne $DisplayName -or $PublisherNode.InnerText -cne $PublisherDisplayName -or
+        $VisualNode.GetAttribute("DisplayName") -cne $DisplayName) {
+        throw "Unpacked MSIX manifest does not match the requested Store identity."
+    }
+    $EmbeddedSource = (Get-Content -LiteralPath (Join-Path $Check "SOURCE_GIT_COMMIT.txt") -Raw -Encoding ASCII).Trim()
+    if ($EmbeddedSource -cne $SourceSha) { throw "Embedded source commit does not match build HEAD." }
     $OriginalHash = (Get-FileHash -LiteralPath $ExePath -Algorithm SHA256).Hash
     $PackedHash = (Get-FileHash -LiteralPath (Join-Path $Check "ExcelCSVPrivacyCleaner.exe") -Algorithm SHA256).Hash
     if ($OriginalHash -ne $PackedHash) { throw "Packaged executable SHA256 differs from input!" }
     $MsixHash = (Get-FileHash -LiteralPath $Package -Algorithm SHA256).Hash
     Write-Host "STORE CANDIDATE ONLY / NOT CERTIFIED: $Package"
     Write-Host "MSIX SHA256: $MsixHash"
+    Write-Host "SOURCE SHA: $SourceSha"
+    Write-Host "MANIFEST IDENTITY MATCH: PASS"
     Write-Host "Next: real install/update/uninstall, offline verification, WACK and Partner Center certification."
 } catch {
     if (Test-Path -LiteralPath $Package) { Remove-Item -LiteralPath $Package -Force }
