@@ -22,6 +22,10 @@ class StoreMsixBuilderContractTests(unittest.TestCase):
         for token in ("ProcessorArchitecture", "PublisherDisplayName", "VisualElements"):
             self.assertIn(token, SCRIPT)
 
+    def test_exact_store_logo_dimensions_are_checked(self):
+        for token in ("StoreLogo.png", "Square44x44Logo.png", "Square150x150Logo.png", "Wrong PNG dimensions"):
+            self.assertIn(token, SCRIPT)
+
     def test_no_implicit_store_version_default(self):
         self.assertNotIn("$Version = '1.0.0.0'", SCRIPT)
         self.assertNotIn('$Version = "1.0.0.0"', SCRIPT)
