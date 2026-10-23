@@ -63,13 +63,27 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $Stage "Assets") -Force | Out-Null
     Copy-Item -LiteralPath $ExePath -Destination (Join-Path $Stage "ExcelCSVPrivacyCleaner.exe") -ErrorAction Stop
     Set-Content -LiteralPath (Join-Path $Stage "SOURCE_GIT_COMMIT.txt") -Value $SourceSha -Encoding ASCII
+    $ExpectedLogoDimensions = @{
+        "StoreLogo.png" = @(50, 50)
+        "Square44x44Logo.png" = @(44, 44)
+        "Square150x150Logo.png" = @(150, 150)
+    }
     foreach ($name in @("StoreLogo.png", "Square44x44Logo.png", "Square150x150Logo.png")) {
         $Source = Join-Path $AssetsDirectory $name
         if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw "Missing real logo asset: $Source" }
         $bytes = [System.IO.File]::ReadAllBytes($Source)
         if ($bytes.Length -lt 24 -or $bytes[0] -ne 137 -or $bytes[1] -ne 80 -or
-            $bytes[2] -ne 78 -or $bytes[3] -ne 71) {
-            throw "Required logo is not a PNG: $Source"
+            $bytes[2] -ne 78 -or $bytes[3] -ne 71 -or $bytes[4] -ne 13 -or
+            $bytes[5] -ne 10 -or $bytes[6] -ne 26 -or $bytes[7] -ne 10 -or
+            $bytes[12] -ne 73 -or $bytes[13] -ne 72 -or $bytes[14] -ne 68 -or $bytes[15] -ne 82) {
+            throw "Required logo is not a valid PNG/IHDR: $Source"
+        }
+        $width = 0; $height = 0
+        for ($i = 16; $i -lt 20; $i++) { $width = ($width * 256) + [int]$bytes[$i] }
+        for ($i = 20; $i -lt 24; $i++) { $height = ($height * 256) + [int]$bytes[$i] }
+        $expected = $ExpectedLogoDimensions[$name]
+        if ($width -ne [int]$expected[0] -or $height -ne [int]$expected[1]) {
+            throw "Wrong PNG dimensions for $name : $width x $height"
         }
         Copy-Item -LiteralPath $Source -Destination (Join-Path (Join-Path $Stage "Assets") $name)
     }
