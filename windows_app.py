@@ -650,7 +650,6 @@ class App:
         ):
             Radiobutton(mode_row, text=description, variable=self.mode,
                         value=value, anchor="w").pack(side=LEFT, padx=(0, 12))
-        Button(options, text="Advanced options", command=self.toggle_advanced).pack(anchor="w")
         self.advanced = Frame(root, padx=12)
         Label(self.advanced, text="Pseudonym key (keep private; use same key for consistent IDs):").pack(anchor="w")
         self.key_entry = Entry(self.advanced, textvariable=self.salt, show="•")
