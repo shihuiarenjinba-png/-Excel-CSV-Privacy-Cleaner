@@ -49,8 +49,143 @@ if (-not (Test-Path -LiteralPath $ExePath -PathType Leaf)) { throw "Built EXE no
 if (-not (Test-Path -LiteralPath $AssetsDirectory -PathType Container)) {
     throw "Provide real store logo PNG assets, not generated placeholders."
 }
-if (-not (Get-Command MakeAppx.exe -ErrorAction SilentlyContinue)) {
-    throw "Windows SDK MakeAppx.exe not on PATH. Install Windows SDK and add its x64 bin directory."
+$MakeAppxCommand = Get-Command MakeAppx.exe -ErrorAction SilentlyContinue
+if ($null -ne $MakeAppxCommand) {
+    $MakeAppxPath = $MakeAppxCommand.Source
+} else {
+    $Kits = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Windows Kits\10\bin'
+    $Found = @()
+    if (Test-Path -LiteralPath $Kits) {
+        $Found = @(Get-ChildItem -LiteralPath $Kits -Recurse -File -Filter 'MakeAppx.exe' -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\MakeAppx[.]exe
+$OutputDir = Join-Path $Root "dist-store"
+New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+$Package = Join-Path $OutputDir ("ExcelCSVPrivacyCleaner_QA_UNSIGNED_" + $Version + "_x64.msix")
+if (Test-Path -LiteralPath $Package) { throw "Candidate MSIX already exists: $Package" }
+$Stage = Join-Path $env:TEMP ("ExcelCSVPrivacyCleaner-msix-" + [guid]::NewGuid().ToString("N"))
+$Check = Join-Path $env:TEMP ("ExcelCSVPrivacyCleaner-check-" + [guid]::NewGuid().ToString("N"))
+try {
+    New-Item -ItemType Directory -Path (Join-Path $Stage "Assets") -Force | Out-Null
+    Copy-Item -LiteralPath $ExePath -Destination (Join-Path $Stage "ExcelCSVPrivacyCleaner.exe") -ErrorAction Stop
+    Set-Content -LiteralPath (Join-Path $Stage "SOURCE_GIT_COMMIT.txt") -Value $SourceSha -Encoding ASCII
+    $ExpectedLogoDimensions = @{
+        "StoreLogo.png" = @(50, 50)
+        "Square44x44Logo.png" = @(44, 44)
+        "Square150x150Logo.png" = @(150, 150)
+    }
+    foreach ($name in @("StoreLogo.png", "Square44x44Logo.png", "Square150x150Logo.png")) {
+        $Source = Join-Path $AssetsDirectory $name
+        if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw "Missing real logo asset: $Source" }
+        $bytes = [System.IO.File]::ReadAllBytes($Source)
+        if ($bytes.Length -lt 24 -or $bytes[0] -ne 137 -or $bytes[1] -ne 80 -or
+            $bytes[2] -ne 78 -or $bytes[3] -ne 71 -or $bytes[4] -ne 13 -or
+            $bytes[5] -ne 10 -or $bytes[6] -ne 26 -or $bytes[7] -ne 10 -or
+            $bytes[12] -ne 73 -or $bytes[13] -ne 72 -or $bytes[14] -ne 68 -or $bytes[15] -ne 82) {
+            throw "Required logo is not a valid PNG/IHDR: $Source"
+        }
+        $width = 0; $height = 0
+        for ($i = 16; $i -lt 20; $i++) { $width = ($width * 256) + [int]$bytes[$i] }
+        for ($i = 20; $i -lt 24; $i++) { $height = ($height * 256) + [int]$bytes[$i] }
+        $expected = $ExpectedLogoDimensions[$name]
+        if ($width -ne [int]$expected[0] -or $height -ne [int]$expected[1]) {
+            throw "Wrong PNG dimensions for $name : $width x $height"
+        }
+        Copy-Item -LiteralPath $Source -Destination (Join-Path (Join-Path $Stage "Assets") $name)
+    }
+    $SafeIdentity = [System.Security.SecurityElement]::Escape($IdentityName)
+    $SafePublisher = [System.Security.SecurityElement]::Escape($Publisher)
+    $SafePublisherName = [System.Security.SecurityElement]::Escape($PublisherDisplayName)
+    $SafeDisplay = [System.Security.SecurityElement]::Escape($DisplayName)
+    $Manifest = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap uap10 rescap">
+  <Identity Name="$SafeIdentity" Publisher="$SafePublisher" Version="$Version" ProcessorArchitecture="x64"/>
+  <Properties>
+    <DisplayName>$SafeDisplay</DisplayName>
+    <PublisherDisplayName>$SafePublisherName</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Resources><Resource Language="ja-JP"/><Resource Language="en-US"/></Resources>
+  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
+  <Applications>
+    <Application Id="App" Executable="ExcelCSVPrivacyCleaner.exe"
+                 uap10:RuntimeBehavior="packagedClassicApp"
+                 uap10:TrustLevel="mediumIL">
+      <uap:VisualElements DisplayName="$SafeDisplay"
+          Description="Local CSV/XLSX column transformation"
+          BackgroundColor="transparent"
+          Square150x150Logo="Assets\Square150x150Logo.png"
+          Square44x44Logo="Assets\Square44x44Logo.png"/>
+    </Application>
+  </Applications>
+  <Capabilities><rescap:Capability Name="runFullTrust"/></Capabilities>
+</Package>
+"@
+    [xml]$Xml = $Manifest
+    if ($Xml.Package.Identity.Publisher -ne $Publisher -or $Xml.Package.Identity.Name -ne $IdentityName) {
+        throw "Store identity XML did not roundtrip."
+    }
+    [System.IO.File]::WriteAllText((Join-Path $Stage "AppxManifest.xml"), $Manifest,
+                                  (New-Object System.Text.UTF8Encoding($false)))
+    & $MakeAppxPath pack /d $Stage /p $Package
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Package -PathType Leaf)) {
+        throw "MakeAppx pack failed"
+    }
+    New-Item -ItemType Directory -Path $Check | Out-Null
+    & $MakeAppxPath unpack /p $Package /d $Check
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $Check "ExcelCSVPrivacyCleaner.exe"))) {
+        throw "MSIX roundtrip unpack or executable verification failed"
+    }
+    [xml]$RoundtripManifest = Get-Content -LiteralPath (Join-Path $Check "AppxManifest.xml") -Raw -Encoding UTF8
+    $Ns = New-Object System.Xml.XmlNamespaceManager($RoundtripManifest.NameTable)
+    $Ns.AddNamespace("f","http://schemas.microsoft.com/appx/manifest/foundation/windows10")
+    $Ns.AddNamespace("uap","http://schemas.microsoft.com/appx/manifest/uap/windows10")
+    $IdNode = $RoundtripManifest.SelectSingleNode("/f:Package/f:Identity",$Ns)
+    $PropsNode = $RoundtripManifest.SelectSingleNode("/f:Package/f:Properties",$Ns)
+    $DependencyNode = $RoundtripManifest.SelectSingleNode("/f:Package/f:Dependencies/f:TargetDeviceFamily",$Ns)
+    $ApplicationNode = $RoundtripManifest.SelectSingleNode("/f:Package/f:Applications/f:Application",$Ns)
+    $VisualNode = $RoundtripManifest.SelectSingleNode("/f:Package/f:Applications/f:Application/uap:VisualElements",$Ns)
+    $DisplayNode = if ($null -ne $PropsNode) { $PropsNode.SelectSingleNode("f:DisplayName",$Ns) } else { $null }
+    $PublisherNode = if ($null -ne $PropsNode) { $PropsNode.SelectSingleNode("f:PublisherDisplayName",$Ns) } else { $null }
+    if ($null -eq $IdNode -or $null -eq $DisplayNode -or $null -eq $PublisherNode -or
+        $null -eq $DependencyNode -or $null -eq $ApplicationNode -or $null -eq $VisualNode -or
+        $IdNode.GetAttribute("Name") -cne $IdentityName -or $IdNode.GetAttribute("Publisher") -cne $Publisher -or
+        $IdNode.GetAttribute("Version") -cne $Version -or $IdNode.GetAttribute("ProcessorArchitecture") -cne "x64" -or
+        $DisplayNode.InnerText -cne $DisplayName -or $PublisherNode.InnerText -cne $PublisherDisplayName -or
+        $DependencyNode.GetAttribute("Name") -cne "Windows.Desktop" -or
+        $DependencyNode.GetAttribute("MinVersion") -cne "10.0.19041.0" -or
+        $ApplicationNode.GetAttribute("Id") -cne "App" -or
+        $ApplicationNode.GetAttribute("Executable") -cne "ExcelCSVPrivacyCleaner.exe" -or
+        $VisualNode.GetAttribute("DisplayName") -cne $DisplayName) {
+        throw "Unpacked MSIX manifest does not match the requested Store identity and entry point."
+    }
+    $EmbeddedSource = (Get-Content -LiteralPath (Join-Path $Check "SOURCE_GIT_COMMIT.txt") -Raw -Encoding ASCII).Trim()
+    if ($EmbeddedSource -cne $SourceSha) { throw "Embedded source commit does not match build HEAD." }
+    $OriginalHash = (Get-FileHash -LiteralPath $ExePath -Algorithm SHA256).Hash
+    $PackedHash = (Get-FileHash -LiteralPath (Join-Path $Check "ExcelCSVPrivacyCleaner.exe") -Algorithm SHA256).Hash
+    if ($OriginalHash -ne $PackedHash) { throw "Packaged executable SHA256 differs from input!" }
+    $MsixHash = (Get-FileHash -LiteralPath $Package -Algorithm SHA256).Hash
+    Write-Host "QA_UNSIGNED / NOT CERTIFIED: $Package"
+    Write-Host "MSIX SHA256: $MsixHash"
+    Write-Host "SOURCE SHA: $SourceSha"
+    Write-Host "MANIFEST IDENTITY MATCH: PASS"
+    Write-Host "Next: real install/update/uninstall, offline verification, WACK and Partner Center certification."
+} catch {
+    if (Test-Path -LiteralPath $Package) { Remove-Item -LiteralPath $Package -Force }
+    throw
+} finally {
+    if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
+    if (Test-Path -LiteralPath $Check) { Remove-Item -LiteralPath $Check -Recurse -Force }
+}
+ } |
+            Sort-Object FullName -Descending)
+    }
+    if ($Found.Count -eq 0) { throw 'Windows SDK MakeAppx.exe was not found.' }
+    $MakeAppxPath = $Found[0].FullName
 }
 
 $OutputDir = Join-Path $Root "dist-store"
@@ -126,12 +261,12 @@ try {
     }
     [System.IO.File]::WriteAllText((Join-Path $Stage "AppxManifest.xml"), $Manifest,
                                   (New-Object System.Text.UTF8Encoding($false)))
-    & MakeAppx.exe pack /d $Stage /p $Package
+    & $MakeAppxPath pack /d $Stage /p $Package
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Package -PathType Leaf)) {
         throw "MakeAppx pack failed"
     }
     New-Item -ItemType Directory -Path $Check | Out-Null
-    & MakeAppx.exe unpack /p $Package /d $Check
+    & $MakeAppxPath unpack /p $Package /d $Check
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $Check "ExcelCSVPrivacyCleaner.exe"))) {
         throw "MSIX roundtrip unpack or executable verification failed"
     }
