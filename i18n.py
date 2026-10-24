@@ -10,6 +10,9 @@ _CONTROLLERS = []
 _PATCHED = False
 
 TEXTS = {
+    "Find columns:": ("Find columns:", "列を検索:"),
+    "Select visible": ("Select visible", "表示中を選択"),
+    "Clear visible": ("Clear visible", "表示中を解除"),
     "4  Preview changes": ("4  Preview changes", "4  変更をプレビュー"),
     "5  Save new copy": ("5  Save new copy", "5  新しいコピーを保存"),
     "① Choose file  →  ② Select columns  →  ③ Pick a method  →  ④ Preview  →  ⑤ Save a new copy": ("① Choose file  →  ② Select columns  →  ③ Pick a method  →  ④ Preview  →  ⑤ Save a new copy", "① ファイル選択  →  ② 列を選択  →  ③ 処理方法  →  ④ プレビュー  →  ⑤ 新しいコピーを保存"),
