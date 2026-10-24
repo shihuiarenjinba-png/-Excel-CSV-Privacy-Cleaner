@@ -595,6 +595,8 @@ class App:
         self.remove_hidden = IntVar(value=1)
         self.remove_comments = IntVar(value=1)
         self.column_vars: dict[str, IntVar] = {}
+        self.column_widgets: dict[str, Checkbutton] = {}
+        self.column_filter = StringVar()
         self.advanced_visible = False
         self.show_key = IntVar(value=0)
         self.key_entry = None
@@ -615,6 +617,12 @@ class App:
         self.export_button.pack(side=LEFT)
 
         Label(root, text="2  Check the columns to process (none selected by default)", anchor="w").pack(fill="x", padx=12, pady=(12, 2))
+        filter_row = Frame(root, padx=12)
+        filter_row.pack(fill="x", pady=(0, 4))
+        Label(filter_row, text="Find columns:").pack(side=LEFT)
+        Entry(filter_row, textvariable=self.column_filter, width=28).pack(side=LEFT, padx=(6, 8))
+        Button(filter_row, text="Select visible", command=lambda: self.set_visible_columns(1)).pack(side=LEFT)
+        Button(filter_row, text="Clear visible", command=lambda: self.set_visible_columns(0)).pack(side=LEFT, padx=(6, 0))
         column_box = Frame(root, padx=12)
         column_box.pack(fill="x")
         self.canvas = Canvas(column_box, height=165, highlightthickness=1)
@@ -655,6 +663,7 @@ class App:
         self.listbox.insert(END, "Choose a CSV or XLSX file to begin.")
         for variable in (self.mode, self.salt, self.remove_hidden, self.remove_comments):
             variable.trace_add("write", self._invalidate_preview)
+        self.column_filter.trace_add("write", lambda *_: self._render_column_filter())
         bind_shortcuts(self.root, {
             "<Control-O>": self.choose,
             "<Control-P>": self.preview,
@@ -662,6 +671,22 @@ class App:
         })
         self.root.protocol("WM_DELETE_WINDOW", self._close)
         self._refresh_actions()
+
+    def _matching_columns(self):
+        query = self.column_filter.get().strip().casefold()
+        return [name for name in self.column_vars if not query or query in name.casefold()]
+
+    def _render_column_filter(self):
+        visible = set(self._matching_columns())
+        for name, widget in self.column_widgets.items():
+            if name in visible:
+                widget.pack(anchor="w")
+            else:
+                widget.pack_forget()
+
+    def set_visible_columns(self, value: int):
+        for name in self._matching_columns():
+            self.column_vars[name].set(value)
 
     def _invalidate_preview(self, *_args):
         self.preview_revision = None
@@ -705,6 +730,7 @@ class App:
             # Never leave a previously chosen source active after a failed replacement.
             self.file = None
             self.column_vars = {}
+            self.column_widgets = {}
             for widget in self.check_area.winfo_children():
                 widget.destroy()
             self.listbox.delete(0, END)
@@ -716,11 +742,15 @@ class App:
         for widget in self.check_area.winfo_children():
             widget.destroy()
         self.column_vars = {}
+        self.column_widgets = {}
+        self.column_filter.set("")
         for name in names:
             state = IntVar(value=0)
             self.column_vars[name] = state
             state.trace_add("write", self._invalidate_preview)
-            Checkbutton(self.check_area, text=name, variable=state, anchor="w").pack(anchor="w")
+            widget = Checkbutton(self.check_area, text=name, variable=state, anchor="w")
+            self.column_widgets[name] = widget
+            widget.pack(anchor="w")
         self.listbox.delete(0, END)
         self.listbox.insert(END, f"Selected: {self.file.name}")
         self.listbox.insert(END, f"Loaded {len(names)} column labels. Check only those you intend to change.")
