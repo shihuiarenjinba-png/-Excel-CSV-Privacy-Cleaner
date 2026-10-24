@@ -602,6 +602,7 @@ class App:
         head.pack(fill="x")
         Label(head, text="Excel / CSV Privacy Cleaner", font=("Segoe UI", 19, "bold")).pack(anchor="w")
         Label(head, text="Select file → check columns → choose method → preview → export a new copy.").pack(anchor="w")
+        Label(head, text="① Choose file  →  ② Select columns  →  ③ Pick a method  →  ④ Preview  →  ⑤ Save a new copy", font=("Segoe UI", 10, "bold"), wraplength=860, justify=LEFT).pack(anchor="w", pady=(4, 0))
         toolbar = Frame(root, padx=12)
         toolbar.pack(fill="x")
         Button(toolbar, text="1  Choose file", command=self.choose, width=17).pack(side=LEFT)
