@@ -141,6 +141,9 @@ def get_language() -> str:
 
 def translate(text):
     if not isinstance(text, str): return text
+    if "\n" in text:
+        first, rest = text.split("\n", 1)
+        return first + "\n" + str(translate(rest))
     if text in TEXTS: return TEXTS[text][1 if _LANGUAGE == "ja" else 0]
     if _LANGUAGE == "ja":
         for en, ja in PHRASES: text = text.replace(en, ja)
