@@ -607,6 +607,7 @@ class App:
         head.pack(fill="x")
         Label(head, text="Excel / CSV Privacy Cleaner", font=("Segoe UI", 19, "bold")).pack(anchor="w")
         Label(head, text="Select file → check columns → choose method → preview → export a new copy.").pack(anchor="w")
+        Label(head, text="Local processing — the original file is never overwritten.", fg="#56616f").pack(anchor="w", pady=(3, 0))
         Label(head, text="① Choose file  →  ② Select columns  →  ③ Pick a method  →  ④ Preview  →  ⑤ Save a new copy", font=("Segoe UI", 10, "bold"), wraplength=860, justify=LEFT).pack(anchor="w", pady=(4, 0))
         self.command_bar = CommandBar(root)
         self.command_bar.pack(fill="x", padx=12, pady=(0, 6))
