@@ -50,6 +50,7 @@ jobs:
           $evidence | ConvertTo-Json -Depth 4 | Out-File -FilePath dist/group-c-exe-evidence.json -Encoding utf8
           Write-Host "EXE_SHA256=$hash"
       - name: Exercise Windows GUI workflow and packaged EXE
+        timeout-minutes: 3
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
