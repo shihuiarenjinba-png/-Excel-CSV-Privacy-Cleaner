@@ -55,7 +55,7 @@ if (-not (Get-Command MakeAppx.exe -ErrorAction SilentlyContinue)) {
 
 $OutputDir = Join-Path $Root "dist-store"
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
-$Package = Join-Path $OutputDir ("ExcelCSVPrivacyCleaner_" + $Version + "_x64.msix")
+$Package = Join-Path $OutputDir ("ExcelCSVPrivacyCleaner_QA_UNSIGNED_" + $Version + "_x64.msix")
 if (Test-Path -LiteralPath $Package) { throw "Candidate MSIX already exists: $Package" }
 $Stage = Join-Path $env:TEMP ("ExcelCSVPrivacyCleaner-msix-" + [guid]::NewGuid().ToString("N"))
 $Check = Join-Path $env:TEMP ("ExcelCSVPrivacyCleaner-check-" + [guid]::NewGuid().ToString("N"))
@@ -157,7 +157,7 @@ try {
     $PackedHash = (Get-FileHash -LiteralPath (Join-Path $Check "ExcelCSVPrivacyCleaner.exe") -Algorithm SHA256).Hash
     if ($OriginalHash -ne $PackedHash) { throw "Packaged executable SHA256 differs from input!" }
     $MsixHash = (Get-FileHash -LiteralPath $Package -Algorithm SHA256).Hash
-    Write-Host "STORE CANDIDATE ONLY / NOT CERTIFIED: $Package"
+    Write-Host "QA_UNSIGNED / NOT CERTIFIED: $Package"
     Write-Host "MSIX SHA256: $MsixHash"
     Write-Host "SOURCE SHA: $SourceSha"
     Write-Host "MANIFEST IDENTITY MATCH: PASS"
