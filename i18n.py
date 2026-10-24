@@ -27,6 +27,11 @@ _CONTROLLERS = []
 _PATCHED = False
 
 TEXTS = {
+    "Open file": ("Open file", "ファイルを開く"),
+    "Preview": ("Preview", "プレビュー"),
+    "Save copy": ("Save copy", "コピーを保存"),
+    "Advanced": ("Advanced", "詳細設定"),
+    "Open a file → choose columns and a method → Preview → Save copy. The original file is never overwritten.": ("Open a file → choose columns and a method → Preview → Save copy. The original file is never overwritten.", "ファイルを開く → 列と処理方法を選ぶ → プレビュー → コピーを保存。元ファイルは上書きしません。"),
     "Opens a file picker and loads the column list.": ("Opens a file picker and loads the column list.", "ファイル選択画面を開き、列一覧を読み込みます。"),
     "Shows sample changes without saving anything.": ("Shows sample changes without saving anything.", "保存せず、変更後の例を表示します。"),
     "Keeps the original and writes a separate cleaned copy.": ("Keeps the original and writes a separate cleaned copy.", "元ファイルを残し、別のクリーンなコピーを保存します。"),
