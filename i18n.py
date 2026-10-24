@@ -27,6 +27,9 @@ _CONTROLLERS = []
 _PATCHED = False
 
 TEXTS = {
+    "Opens a file picker and loads the column list.": ("Opens a file picker and loads the column list.", "ファイル選択画面を開き、列一覧を読み込みます。"),
+    "Shows sample changes without saving anything.": ("Shows sample changes without saving anything.", "保存せず、変更後の例を表示します。"),
+    "Keeps the original and writes a separate cleaned copy.": ("Keeps the original and writes a separate cleaned copy.", "元ファイルを残し、別のクリーンなコピーを保存します。"),
     "Find columns:": ("Find columns:", "列を検索:"),
     "Select visible": ("Select visible", "表示中を選択"),
     "Clear visible": ("Clear visible", "表示中を解除"),
