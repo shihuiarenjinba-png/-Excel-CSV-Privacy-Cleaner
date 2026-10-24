@@ -27,6 +27,7 @@ _CONTROLLERS = []
 _PATCHED = False
 
 TEXTS = {
+    "Local processing — the original file is never overwritten.": ("Local processing — the original file is never overwritten.", "ローカル処理 — 元ファイルは上書きしません。"),
     "Open file": ("Open file", "ファイルを開く"),
     "Preview": ("Preview", "プレビュー"),
     "Save copy": ("Save copy", "コピーを保存"),
