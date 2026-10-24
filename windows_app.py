@@ -611,10 +611,13 @@ class App:
         toolbar.pack(fill="x")
         self.choose_button = Button(toolbar, text="1  Choose file", command=self.choose, width=17)
         self.choose_button.pack(side=LEFT)
+        Label(toolbar, text="選ぶと列一覧を読み込みます", fg="#666666").pack(side=LEFT, padx=(6, 12))
         self.preview_button = Button(toolbar, text="4  Preview changes", command=self.preview, width=20)
         self.preview_button.pack(side=LEFT, padx=8)
+        Label(toolbar, text="保存せず変更後の例を確認", fg="#666666").pack(side=LEFT, padx=(0, 12))
         self.export_button = Button(toolbar, text="5  Save new copy", command=self.export, width=19)
         self.export_button.pack(side=LEFT)
+        Label(toolbar, text="元ファイルを残して別コピーを保存", fg="#666666").pack(side=LEFT, padx=(6, 0))
 
         Label(root, text="2  Check the columns to process (none selected by default)", anchor="w").pack(fill="x", padx=12, pady=(12, 2))
         filter_row = Frame(root, padx=12)
