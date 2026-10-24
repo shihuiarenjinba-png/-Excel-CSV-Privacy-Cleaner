@@ -13,6 +13,7 @@ from pathlib import Path
 from tkinter import BOTH, END, LEFT, Button, Canvas, Checkbutton, Entry, Frame, IntVar, Label, Listbox, Radiobutton, Scrollbar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
 from ui_export_approval import export_revision
+from ui_desktop import bind_shortcuts, restore_window_state, save_window_state
 
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?81[- ]?)?0?\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}(?!\d)")
@@ -587,6 +588,7 @@ class App:
         self.root.title("Excel / CSV Privacy Cleaner — Windows")
         self.root.geometry("940x680")
         self.root.minsize(820, 600)
+        restore_window_state(self.root, "ExcelCSVPrivacyCleaner", min_width=820, min_height=600)
         self.file: Path | None = None
         self.mode = StringVar(value="mask")
         self.salt = StringVar(value=secrets.token_hex(16))
@@ -605,9 +607,12 @@ class App:
         Label(head, text="① Choose file  →  ② Select columns  →  ③ Pick a method  →  ④ Preview  →  ⑤ Save a new copy", font=("Segoe UI", 10, "bold"), wraplength=860, justify=LEFT).pack(anchor="w", pady=(4, 0))
         toolbar = Frame(root, padx=12)
         toolbar.pack(fill="x")
-        Button(toolbar, text="1  Choose file", command=self.choose, width=17).pack(side=LEFT)
-        Button(toolbar, text="4  Preview changes", command=self.preview, width=20).pack(side=LEFT, padx=8)
-        Button(toolbar, text="5  Save new copy", command=self.export, width=19).pack(side=LEFT)
+        self.choose_button = Button(toolbar, text="1  Choose file", command=self.choose, width=17)
+        self.choose_button.pack(side=LEFT)
+        self.preview_button = Button(toolbar, text="4  Preview changes", command=self.preview, width=20)
+        self.preview_button.pack(side=LEFT, padx=8)
+        self.export_button = Button(toolbar, text="5  Save new copy", command=self.export, width=19)
+        self.export_button.pack(side=LEFT)
 
         Label(root, text="2  Check the columns to process (none selected by default)", anchor="w").pack(fill="x", padx=12, pady=(12, 2))
         column_box = Frame(root, padx=12)
@@ -648,6 +653,28 @@ class App:
         self.listbox = Listbox(root, font=("Consolas", 10))
         self.listbox.pack(fill=BOTH, expand=True, padx=12, pady=(0, 12))
         self.listbox.insert(END, "Choose a CSV or XLSX file to begin.")
+        for variable in (self.mode, self.salt, self.remove_hidden, self.remove_comments):
+            variable.trace_add("write", self._invalidate_preview)
+        bind_shortcuts(self.root, {
+            "<Control-O>": self.choose,
+            "<Control-P>": self.preview,
+            "<Control-S>": self.export,
+        })
+        self.root.protocol("WM_DELETE_WINDOW", self._close)
+        self._refresh_actions()
+
+    def _invalidate_preview(self, *_args):
+        self.preview_revision = None
+        self._refresh_actions()
+
+    def _refresh_actions(self):
+        ready = self.file is not None and bool(self.selected_columns())
+        self.preview_button.configure(state="normal" if ready else "disabled")
+        self.export_button.configure(state="normal" if ready and self.preview_revision else "disabled")
+
+    def _close(self):
+        save_window_state(self.root, "ExcelCSVPrivacyCleaner")
+        self.root.destroy()
 
     def toggle_key_visibility(self):
         self.key_entry.configure(show="" if self.show_key.get() else "•")
@@ -692,10 +719,12 @@ class App:
         for name in names:
             state = IntVar(value=0)
             self.column_vars[name] = state
+            state.trace_add("write", self._invalidate_preview)
             Checkbutton(self.check_area, text=name, variable=state, anchor="w").pack(anchor="w")
         self.listbox.delete(0, END)
         self.listbox.insert(END, f"Selected: {self.file.name}")
         self.listbox.insert(END, f"Loaded {len(names)} column labels. Check only those you intend to change.")
+        self._refresh_actions()
 
     def preview(self):
         if self.file is None:
@@ -713,11 +742,13 @@ class App:
             if before != after:
                 raise ValueError("入力がプレビュー中に更新されました。再度確認してください。")
             self.preview_revision = after
+            self._refresh_actions()
             self.listbox.delete(0, END)
             for line in lines:
                 self.listbox.insert(END, line)
         except Exception as exc:
             self.preview_revision = None
+            self._refresh_actions()
             messagebox.showerror("Preview failed", str(exc))
 
     def export(self):
@@ -759,6 +790,7 @@ class App:
         if destination.exists() or destination.is_symlink():
             return messagebox.showerror("File exists", "Choose a new output filename; existing files are never replaced.")
         self.preview_revision = None  # Approval is single-use; no automatic replay.
+        self._refresh_actions()
         try:
             if ext == ".csv":
                 stats = clean_csv(self.file, destination, selected, mode, self.salt.get())
