@@ -57,7 +57,12 @@ if ($null -ne $MakeAppxCommand) {
     $Found = @()
     if (Test-Path -LiteralPath $Kits) {
         $Found = @(Get-ChildItem -LiteralPath $Kits -Recurse -File -Filter 'MakeAppx.exe' -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match '\\x64\\MakeAppx[.]exe
+            Where-Object { $_.FullName -like '*\x64\MakeAppx.exe' } |
+            Sort-Object FullName -Descending)
+    }
+    if ($Found.Count -eq 0) { throw 'Windows SDK MakeAppx.exe was not found.' }
+    $MakeAppxPath = $Found[0].FullName
+}
 $OutputDir = Join-Path $Root "dist-store"
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 $Package = Join-Path $OutputDir ("ExcelCSVPrivacyCleaner_QA_UNSIGNED_" + $Version + "_x64.msix")
