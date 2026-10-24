@@ -606,8 +606,8 @@ class App:
         toolbar = Frame(root, padx=12)
         toolbar.pack(fill="x")
         Button(toolbar, text="1  Choose file", command=self.choose, width=17).pack(side=LEFT)
-        Button(toolbar, text="4  Preview (no write)", command=self.preview, width=20).pack(side=LEFT, padx=8)
-        Button(toolbar, text="5  Confirm & export", command=self.export, width=19).pack(side=LEFT)
+        Button(toolbar, text="4  Preview changes", command=self.preview, width=20).pack(side=LEFT, padx=8)
+        Button(toolbar, text="5  Save new copy", command=self.export, width=19).pack(side=LEFT)
 
         Label(root, text="2  Check the columns to process (none selected by default)", anchor="w").pack(fill="x", padx=12, pady=(12, 2))
         column_box = Frame(root, padx=12)
