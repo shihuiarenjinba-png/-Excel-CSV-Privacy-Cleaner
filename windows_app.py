@@ -14,6 +14,7 @@ from tkinter import BOTH, END, LEFT, Button, Canvas, Checkbutton, Entry, Frame, 
 from tkinter import ttk
 from ui_export_approval import export_revision
 from ui_desktop import bind_shortcuts, restore_window_state, save_window_state
+from ui_commandbar import CommandBar
 
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?81[- ]?)?0?\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}(?!\d)")
@@ -607,26 +608,16 @@ class App:
         Label(head, text="Excel / CSV Privacy Cleaner", font=("Segoe UI", 19, "bold")).pack(anchor="w")
         Label(head, text="Select file → check columns → choose method → preview → export a new copy.").pack(anchor="w")
         Label(head, text="① Choose file  →  ② Select columns  →  ③ Pick a method  →  ④ Preview  →  ⑤ Save a new copy", font=("Segoe UI", 10, "bold"), wraplength=860, justify=LEFT).pack(anchor="w", pady=(4, 0))
-        toolbar = Frame(root, padx=12)
-        toolbar.pack(fill="x")
-        choose_card = Frame(toolbar, padx=6, pady=4)
-        choose_card.pack(side=LEFT, fill="x", expand=True)
-        self.choose_button = Button(choose_card, text="1  Choose file", command=self.choose, width=17)
-        self.choose_button.pack(anchor="w")
-        Label(choose_card, text="Opens a file picker and loads the column list.", fg="#666666",
-              wraplength=230, justify=LEFT).pack(anchor="w", pady=(3, 0))
-        preview_card = Frame(toolbar, padx=6, pady=4)
-        preview_card.pack(side=LEFT, fill="x", expand=True)
-        self.preview_button = Button(preview_card, text="4  Preview changes", command=self.preview, width=20)
-        self.preview_button.pack(anchor="w")
-        Label(preview_card, text="Shows sample changes without saving anything.", fg="#666666",
-              wraplength=230, justify=LEFT).pack(anchor="w", pady=(3, 0))
-        save_card = Frame(toolbar, padx=6, pady=4)
-        save_card.pack(side=LEFT, fill="x", expand=True)
-        self.export_button = Button(save_card, text="5  Save new copy", command=self.export, width=19)
-        self.export_button.pack(anchor="w")
-        Label(save_card, text="Keeps the original and writes a separate cleaned copy.", fg="#666666",
-              wraplength=240, justify=LEFT).pack(anchor="w", pady=(3, 0))
+        self.command_bar = CommandBar(root)
+        self.command_bar.pack(fill="x", padx=12, pady=(0, 6))
+        self.choose_button = self.command_bar.add_command("open", "＋", "Open file", self.choose, primary=True)
+        self.preview_button = self.command_bar.add_command("preview", "◉", "Preview", self.preview, enabled=False)
+        self.export_button = self.command_bar.add_command("save", "▣", "Save copy", self.export, enabled=False)
+        self.command_bar.add_separator()
+        self.command_bar.add_command("advanced", "⚙", "Advanced", self.toggle_advanced)
+        self.command_bar.add_spacer()
+        Label(root, text="Open a file → choose columns and a method → Preview → Save copy. The original file is never overwritten.",
+              fg="#56616f", anchor="w").pack(fill="x", padx=18, pady=(0, 6))
 
         Label(root, text="2  Check the columns to process (none selected by default)", anchor="w").pack(fill="x", padx=12, pady=(12, 2))
         filter_row = Frame(root, padx=12)
