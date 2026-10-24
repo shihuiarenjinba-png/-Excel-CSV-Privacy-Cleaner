@@ -10,6 +10,8 @@ _CONTROLLERS = []
 _PATCHED = False
 
 TEXTS = {
+    "4  Preview changes": ("4  Preview changes", "4  変更をプレビュー"),
+    "5  Save new copy": ("5  Save new copy", "5  新しいコピーを保存"),
     "① Choose file  →  ② Select columns  →  ③ Pick a method  →  ④ Preview  →  ⑤ Save a new copy": ("① Choose file  →  ② Select columns  →  ③ Pick a method  →  ④ Preview  →  ⑤ Save a new copy", "① ファイル選択  →  ② 列を選択  →  ③ 処理方法  →  ④ プレビュー  →  ⑤ 新しいコピーを保存"),
     "Excel / CSV Privacy Cleaner": ("Excel / CSV Privacy Cleaner", "Excel / CSVプライバシークリーナー"),
     "Select file → check columns → choose method → preview → export a new copy.": ("Select file → check columns → choose method → preview → export a new copy.", "ファイル選択 → 列をチェック → 処理方法 → プレビュー → 新しいコピーを出力"),
