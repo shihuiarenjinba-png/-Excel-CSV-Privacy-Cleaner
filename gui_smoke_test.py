@@ -24,6 +24,11 @@ def main() -> None:
             ])
         original = source.read_bytes()
         root = Tk()
+        warning_guard = patch.object(
+            messagebox, "showwarning",
+            side_effect=AssertionError("Unexpected warning dialog during GUI smoke"),
+        )
+        warning_guard.start()
         try:
             root.withdraw()
             app = App(root)
@@ -68,6 +73,10 @@ def main() -> None:
             assert output[0]["名前"] == "Alice"
             assert output[1]["部署"] == "営業"
             previous = dest.read_bytes()
+            # Export approval is single-use: preview again before testing the
+            # separate no-overwrite safeguard, rather than opening a modal.
+            with patch.object(messagebox, "showerror", side_effect=AssertionError):
+                app.preview()
             with patch.object(messagebox, "askokcancel", return_value=True), \
                  patch.object(filedialog, "asksaveasfilename", return_value=str(dest)), \
                  patch.object(messagebox, "showerror") as error:
@@ -90,6 +99,7 @@ def main() -> None:
             print("GUI_SYNTHETIC_E2E_OK: choose, checkbox, preview, export, no-overwrite, stale-state reset")
             print("HUMAN_VISUAL_ACCEPTANCE_NOT_TESTED")
         finally:
+            warning_guard.stop()
             root.destroy()
 
 
