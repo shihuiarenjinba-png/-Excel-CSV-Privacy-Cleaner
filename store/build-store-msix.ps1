@@ -42,7 +42,7 @@ if ($Publisher -notmatch '^CN=.+$' -or $Publisher -match '(?i)(example|placehold
 }
 $parts = $Version.Split('.')
 if ($parts.Count -ne 4 -or [int]$parts[0] -lt 1 -or
-    ($parts | Where-Object { [long]$_ -gt 65535 }).Count -gt 0) {
+    @($parts | Where-Object { [long]$_ -gt 65535 }).Count -gt 0) {
     throw "MSIX Store version must be 1..65535 for major, <=65535 for minor/build, and fourth field 0."
 }
 if (-not (Test-Path -LiteralPath $ExePath -PathType Leaf)) { throw "Built EXE not found: $ExePath" }
